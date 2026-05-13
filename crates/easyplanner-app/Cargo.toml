@@ -4,11 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-easyplanner = { path = "../easyplanner" }
-uniffi = { workspace = true }
-
-[build-dependencies]
-uniffi = { workspace = true, features = [ "build" ] }
+boltffi = "0.25.0"
 
 [lib]
-crate-type = ["cdylib", "staticlib", "lib"]
+crate-type = ["cdylib", "staticlib"]

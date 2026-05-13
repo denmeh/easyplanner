@@ -1,6 +1,8 @@
 # Cargo (workspace build output)
 target/
 
+crates/easyplanner-app/dist/
+
 # Rustfmt backups
 **/*.rs.bk
 

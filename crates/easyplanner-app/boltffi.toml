@@ -1,0 +1,9 @@
+[package]
+name = "easyplanner-app"
+
+[targets.wasm]
+enabled = true
+output = "dist/wasm"
+
+[targets.wasm.npm]
+package_name = "easyplanner-app"

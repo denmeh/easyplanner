@@ -1,10 +1,13 @@
-uniffi::setup_scaffolding!();
+use boltffi::*;
 
-pub use easyplanner::*;
-
-
-#[uniffi::export]
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+#[data]
+#[derive(Debug, Clone, Copy)]
+pub struct Point {
+    pub x: f64,
+    pub y: f64,
 }
 
+#[export]
+pub fn distance(a: Point, b: Point) -> f64 {
+    ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt()
+}
