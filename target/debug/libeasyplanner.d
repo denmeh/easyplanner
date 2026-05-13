@@ -1,0 +1,1 @@
+C:\Users\Lenovo\personal\easyplanner\target\debug\libeasyplanner.rlib: C:\Users\Lenovo\personal\easyplanner\crates\easyplanner\src\calendar.rs C:\Users\Lenovo\personal\easyplanner\crates\easyplanner\src\lib.rs C:\Users\Lenovo\personal\easyplanner\crates\easyplanner\src\model.rs

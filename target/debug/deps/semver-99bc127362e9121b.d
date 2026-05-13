@@ -1,0 +1,12 @@
+C:\Users\Lenovo\personal\easyplanner\target\debug\deps\semver-99bc127362e9121b.d: C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\lib.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\display.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\error.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\eval.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\identifier.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\impls.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\parse.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\serde.rs
+
+C:\Users\Lenovo\personal\easyplanner\target\debug\deps\libsemver-99bc127362e9121b.rmeta: C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\lib.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\display.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\error.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\eval.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\identifier.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\impls.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\parse.rs C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\serde.rs
+
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\lib.rs:
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\display.rs:
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\error.rs:
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\eval.rs:
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\identifier.rs:
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\impls.rs:
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\parse.rs:
+C:\Users\Lenovo\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\semver-1.0.28\src\serde.rs:
