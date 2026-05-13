@@ -183,8 +183,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "easyplanner-cli"
+name = "easyplanner-app"
 version = "0.1.0"
+dependencies = [
+ "easyplanner",
+ "uniffi",
+]
 
 [[package]]
 name = "equivalent"
@@ -765,6 +769,7 @@ dependencies = [
  "anyhow",
  "cargo_metadata",
  "uniffi_bindgen",
+ "uniffi_build",
  "uniffi_core",
  "uniffi_macros",
  "uniffi_pipeline",
@@ -794,6 +799,17 @@ dependencies = [
  "uniffi_meta",
  "uniffi_pipeline",
  "uniffi_udl",
+]
+
+[[package]]
+name = "uniffi_build"
+version = "0.31.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c39413c43b955e4aa8a4e2b34bbd1b6b5ff6bd85532b52f9eb92fbe88c14458"
+dependencies = [
+ "anyhow",
+ "camino",
+ "uniffi_bindgen",
 ]
 
 [[package]]

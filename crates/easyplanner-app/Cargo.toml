@@ -1,0 +1,14 @@
+[package]
+name = "easyplanner-app"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+easyplanner = { path = "../easyplanner" }
+uniffi = { workspace = true }
+
+[build-dependencies]
+uniffi = { workspace = true, features = [ "build" ] }
+
+[lib]
+crate-type = ["cdylib", "staticlib", "lib"]
