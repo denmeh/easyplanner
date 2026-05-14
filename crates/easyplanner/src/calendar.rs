@@ -8,7 +8,6 @@ use thiserror::Error;
 use crate::model::Timestamp;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "bindings", derive(uniffi::Object))]
 pub struct Calendar {
     /// Optional weekday specification (Mon,Tue..Fri)
     weekdays: Option<Vec<Weekday>>,
@@ -29,7 +28,6 @@ pub struct Calendar {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "bindings", derive(uniffi::Record))]
 pub struct CalendarWrapper {
     inner: Arc<Calendar>,
 }
@@ -64,12 +62,6 @@ impl<'de> Deserialize<'de> for CalendarWrapper {
         })
     }
 }
-
-// #[cfg(feature = "bindings")]
-// uniffi::custom_type!(Calendar, String, {
-//     lower: |s| s.to_string(),
-//     try_lift: |s| Ok(Calendar::from_str(&s)?),
-// });
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TimeComponent<const MIN: u32, const MAX: u32> {
@@ -119,18 +111,7 @@ impl<const MIN: u32, const MAX: u32> TimeComponent<MIN, MAX> {
     }
 }
 
-// #[cfg(feature = "bindings")]
-// macro_rules! create_specialized_time_component {
-//     ($name:ident, $min:expr, $max:expr) => {
-//         #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-//         pub struct $name(pub TimeComponent<$min, $max>);
-//         impl Deref for $name {
-//             type Target = TimeComponent<$min, $max>;
-//
-//             fn deref(&self) -> &Self::Target {
-//                 &self.0
-//             }
-//         }
+
 //         impl From<TimeComponent<$min, $max>> for $name {
 //             fn from(value: TimeComponent<$min, $max>) -> Self {
 //                 $name(value)
@@ -205,7 +186,6 @@ pub enum Weekday {
 }
 
 #[derive(Debug, Error)]
-#[cfg_attr(feature = "bindings", derive(uniffi::Error))]
 pub enum CalendarError {
     #[error("Invalid calendar format")]
     InvalidFormat,
@@ -607,7 +587,6 @@ impl Calendar {
     }
 }
 
-#[cfg_attr(feature = "bindings", uniffi::export)]
 impl Calendar {
     pub fn next_occurrence(&self, from: Timestamp) -> Option<Timestamp> {
         let timezone = self.timezone.as_ref().unwrap_or(&chrono_tz::Tz::UTC);

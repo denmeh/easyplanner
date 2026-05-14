@@ -53,6 +53,3 @@ impl<'de> Deserialize<'de> for Timestamp {
             .map_err(|e| Error::custom(format!("Invalid timestamp: {}", e)))
     }
 }
-
-#[cfg(feature = "bindings")]
-uniffi::custom_newtype!(Timestamp, u64);

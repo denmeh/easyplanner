@@ -1,7 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/easyplanner"]
-exclude = ["crates/easyplanner-app"]
+members = ["crates/easyplanner", "crates/easyplanner-app"]
 
 [workspace.dependencies]
 serde = { version = "1.0", features = ["derive"] }
@@ -11,6 +10,4 @@ chrono = "0.4.40"
 chrono-tz = { version = "0.10.3", features = ["serde"] }
 thiserror = "1.0"
 
-
-uniffi = "0.31.1"
-
+boltffi = "0.25.0"
