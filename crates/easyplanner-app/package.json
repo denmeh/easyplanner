@@ -1,0 +1,11 @@
+{
+  "name": "easyplanner-app-wasm-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo:wasm": "node ./wasm-demo.mjs"
+  },
+  "dependencies": {
+    "@boltffi/runtime": "*"
+  }
+}
