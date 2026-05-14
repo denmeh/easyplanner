@@ -5,10 +5,10 @@
   <title>easyplanner-app WASM</title>
 </head>
 <script type="module">
-  import init, { distance } from './dist/wasm/pkg/web.js';
-  
+  import init, { distance } from '../dist/wasm/pkg/web.js';
+
   await init();
-  
+
   const p1 = { x: 0, y: 0 };
   const p2 = { x: 3, y: 4 };
   console.log(distance(p1, p2));  // 5.0

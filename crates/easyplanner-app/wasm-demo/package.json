@@ -1,0 +1,8 @@
+{
+  "name": "easyplanner-app-wasm-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "demo:wasm": "npm --prefix .. run demo:wasm"
+  }
+}
