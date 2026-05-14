@@ -72,9 +72,11 @@ output = "dist/wasm"
 package_name = "@denmeh/easyplanner"
 
 [targets.java.jvm]
-enabled = false
+enabled = true
 output = "dist/java"
 strip_symbols = false
+# host_targets = ["current"]
+
 
 [targets.java.jvm.debug_symbols]
 enabled = false
