@@ -36,12 +36,12 @@ format = "zip"
 bundle = "unstripped"
 
 [targets.android]
-enabled = false
+enabled = true
 output = "dist/android"
 min_sdk = 24
 
 [targets.android.kotlin]
-package = "com.example.easyplanner_app"
+package = "com.github.unldenis.easyplanner"
 desktop_loader = "bundled"
 api_style = "top_level"
 error_style = "throwing"

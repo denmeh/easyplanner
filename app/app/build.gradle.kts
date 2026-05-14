@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -36,6 +38,13 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+
+    // BoltFFI: run `boltffi pack android` from `crates/easyplanner-app` before building if dist is missing.
+    sourceSets.named("main") {
+        val boltffiAndroid = File(rootProject.projectDir, "../crates/easyplanner-app/dist/android").normalize()
+        kotlin.srcDir(File(boltffiAndroid, "kotlin"))
+        jniLibs.srcDirs(File(boltffiAndroid, "jniLibs"))
     }
 }
 

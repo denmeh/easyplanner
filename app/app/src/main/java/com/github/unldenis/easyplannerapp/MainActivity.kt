@@ -11,6 +11,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.github.unldenis.easyplanner.Point
+import com.github.unldenis.easyplanner.distance
 import com.github.unldenis.easyplannerapp.ui.theme.EasyPlannerTheme
 
 class MainActivity : ComponentActivity() {
@@ -22,6 +24,7 @@ class MainActivity : ComponentActivity() {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Greeting(
                         name = "Android",
+                        ffiSample = distance(Point(0.0, 0.0), Point(3.0, 4.0)),
                         modifier = Modifier.padding(innerPadding)
                     )
                 }
@@ -31,9 +34,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
+fun Greeting(name: String, ffiSample: Double, modifier: Modifier = Modifier) {
     Text(
-        text = "Hello $name!",
+        text = "Hello $name! (Rust FFI distance 0→3,4 = $ffiSample)",
         modifier = modifier
     )
 }
@@ -42,6 +45,6 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
 @Composable
 fun GreetingPreview() {
     EasyPlannerTheme {
-        Greeting("Android")
+        Greeting("Android", ffiSample = 0.0)
     }
 }
