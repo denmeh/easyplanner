@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "EasyPlannerApp"
+rootProject.name = "EasyPlanner"
 include(":app")
  
