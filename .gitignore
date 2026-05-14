@@ -12,3 +12,6 @@ crates/easyplanner-app/dist/
 .env
 .env.*
 !.env.example
+
+# Cursor rules
+.cursor/

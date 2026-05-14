@@ -10,4 +10,9 @@ chrono = "0.4.40"
 chrono-tz = { version = "0.10.3", features = ["serde"] }
 thiserror = "1.0"
 
+rusqlite = { version = "0.32", features = ["bundled"] }
+refinery = { version = "0.8.16", default-features = false, features = [
+    "rusqlite-bundled",
+] }
+
 boltffi = "0.25.0"

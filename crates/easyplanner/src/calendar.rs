@@ -86,7 +86,9 @@ impl<const MIN: u32, const MAX: u32> TimeComponent<MIN, MAX> {
                 let step = step.unwrap_or(1);
                 if v < *start || v > *end {
                     false
-                } else { (v - *start).is_multiple_of(step) }
+                } else {
+                    (v - *start).is_multiple_of(step)
+                }
             }
         }
     }
@@ -110,7 +112,6 @@ impl<const MIN: u32, const MAX: u32> TimeComponent<MIN, MAX> {
         }
     }
 }
-
 
 //         impl From<TimeComponent<$min, $max>> for $name {
 //             fn from(value: TimeComponent<$min, $max>) -> Self {
@@ -496,9 +497,9 @@ impl Calendar {
             && let TimeComponent::Range {
                 step: Some(step), ..
             } = &self.minute
-            {
-                return Some(format!("Every {} minutes", step));
-            }
+        {
+            return Some(format!("Every {} minutes", step));
+        }
 
         if matches!(self.year, TimeComponent::Any)
             && matches!(self.month, TimeComponent::Any)
@@ -506,17 +507,18 @@ impl Calendar {
             && let TimeComponent::Range {
                 step: Some(step), ..
             } = &self.hour
-            {
-                return Some(format!("Every {} hours", step));
-            }
+        {
+            return Some(format!("Every {} hours", step));
+        }
 
-        if matches!(self.year, TimeComponent::Any) && matches!(self.month, TimeComponent::Any)
+        if matches!(self.year, TimeComponent::Any)
+            && matches!(self.month, TimeComponent::Any)
             && let TimeComponent::Range {
                 step: Some(step), ..
             } = &self.day
-            {
-                return Some(format!("Every {} days", step));
-            }
+        {
+            return Some(format!("Every {} days", step));
+        }
 
         if matches!(self.day, TimeComponent::Any)
             && matches!(self.month, TimeComponent::Any)
@@ -527,12 +529,13 @@ impl Calendar {
 
         // Check for specific day of month
         if let TimeComponent::Values(ref days) = self.day
-            && days.len() == 1 {
-                return Some(format!(
-                    "On the {} day of each month",
-                    Self::ordinal(days[0])
-                ));
-            }
+            && days.len() == 1
+        {
+            return Some(format!(
+                "On the {} day of each month",
+                Self::ordinal(days[0])
+            ));
+        }
 
         // For more complex patterns
         Some("On a custom schedule".to_string())
@@ -558,30 +561,33 @@ impl Calendar {
             TimeComponent::Values(mins),
             TimeComponent::Values(secs),
         ) = (&self.hour, &self.minute, &self.second)
-            && hours.len() == 1 && mins.len() == 1 && secs.len() == 1 {
-                let h = hours[0];
-                let m = mins[0];
+            && hours.len() == 1
+            && mins.len() == 1
+            && secs.len() == 1
+        {
+            let h = hours[0];
+            let m = mins[0];
 
-                // Special names for common times
-                if h == 12 && m == 0 {
-                    return Some("noon".to_string());
-                }
-                if h == 0 && m == 0 {
-                    return Some("midnight".to_string());
-                }
-
-                // Use AM/PM format
-                let period = if h >= 12 { "PM" } else { "AM" };
-                let h12 = if h == 0 {
-                    12
-                } else if h > 12 {
-                    h - 12
-                } else {
-                    h
-                };
-
-                return Some(format!("{:02}:{:02} {}", h12, m, period));
+            // Special names for common times
+            if h == 12 && m == 0 {
+                return Some("noon".to_string());
             }
+            if h == 0 && m == 0 {
+                return Some("midnight".to_string());
+            }
+
+            // Use AM/PM format
+            let period = if h >= 12 { "PM" } else { "AM" };
+            let h12 = if h == 0 {
+                12
+            } else if h > 12 {
+                h - 12
+            } else {
+                h
+            };
+
+            return Some(format!("{:02}:{:02} {}", h12, m, period));
+        }
 
         None
     }
@@ -595,7 +601,9 @@ impl Calendar {
             .expect("Invalid timestamp")
             .with_timezone(timezone);
 
-        let is_leap_year = |year: u32| year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+        let is_leap_year = |year: u32| {
+            year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
+        };
         let days_in_month = |year: u32, month: u32| match month {
             1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
             4 | 6 | 9 | 11 => 30,
@@ -703,10 +711,9 @@ impl Calendar {
         }
 
         // Add timezone if present and requested
-        if show_timezone
-            && let Some(tz) = &self.timezone {
-                parts.push(format!("({})", tz));
-            }
+        if show_timezone && let Some(tz) = &self.timezone {
+            parts.push(format!("({})", tz));
+        }
 
         parts.join(" ")
     }
@@ -843,7 +850,11 @@ impl fmt::Display for Calendar {
         write!(f, "{}-{}-{} ", self.year, self.month, self.day)?;
 
         // Time part
-        write!(f, "{}:{}:{}", self.hour, self.minute, self.second)
+        write!(f, "{}:{}:{}", self.hour, self.minute, self.second)?;
+        if let Some(tz) = self.timezone {
+            write!(f, " {tz}")?;
+        }
+        Ok(())
     }
 }
 
@@ -967,7 +978,7 @@ mod tests {
             second: TimeComponent::Values(vec![0]),
             timezone: None,
         };
-        assert_eq!(cal.to_string(), "Mon,Wed,Fri *-*-* 0:0:0");
+        assert_eq!(cal.to_string(), "Mon,Wed,Fri *-*-* 00:00:00");
     }
 
     #[test]
@@ -984,10 +995,10 @@ mod tests {
             Err(CalendarError::InvalidTimeComponent(_))
         ));
 
-        // Invalid range (start > end)
+        // Invalid range (start > end) on hour
         assert!(matches!(
             Calendar::from_str("Mon *-*-* 10..5:00:00"),
-            Err(CalendarError::InvalidFormat)
+            Err(CalendarError::InvalidRange { start: 10, end: 5 })
         ));
 
         // Empty string
@@ -996,10 +1007,10 @@ mod tests {
             Err(CalendarError::InvalidFormat)
         ));
 
-        // Invalid date format
+        // Slash-separated date (not supported; first token fails weekday parse)
         assert!(matches!(
             Calendar::from_str("2023/12/25"),
-            Err(CalendarError::InvalidFormat)
+            Err(CalendarError::InvalidWeekday(s)) if s == "2023/12/25"
         ));
 
         // Invalid time format
@@ -1008,16 +1019,16 @@ mod tests {
             Err(CalendarError::InvalidFormat)
         ));
 
-        // Invalid weekday range
+        // Invalid weekday range endpoint
         assert!(matches!(
             Calendar::from_str("Mon..Invalid *-*-* 00:00:00"),
-            Err(CalendarError::InvalidFormat),
+            Err(CalendarError::InvalidWeekday(s)) if s == "invalid"
         ));
 
-        // Invalid step value
+        // Invalid step value in minute range
         assert!(matches!(
             Calendar::from_str("*-*-* 1..10/invalid:00:00"),
-            Err(CalendarError::InvalidFormat)
+            Err(CalendarError::InvalidTimeComponent(_))
         ));
     }
 
