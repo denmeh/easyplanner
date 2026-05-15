@@ -69,8 +69,6 @@ pub trait TaskRepository {
         status: TaskStatus,
     ) -> Result<i64, StoreError>;
 
-    fn get_task(&self, id: i64) -> Result<TaskRow, StoreError>;
-
     /// Scheduler-facing view: only active, enabled rows with a concrete next time at or before `now`,
     /// ordered soonest-first so a worker can process the next due items without sorting in app code.
     fn tasks_due_before(&self, now: Timestamp) -> Result<Vec<TaskRow>, StoreError>;

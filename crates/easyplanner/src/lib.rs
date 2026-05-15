@@ -5,10 +5,12 @@ pub mod calendar;
 pub mod model;
 
 #[cfg(feature = "storage-sqlite")]
-pub mod store;
-
-#[cfg(feature = "storage-sqlite")]
-pub mod planning;
-
-#[cfg(feature = "storage-sqlite")]
 pub mod scheduler;
+
+#[cfg(feature = "storage-sqlite")]
+pub use scheduler::{
+    SchedulerError, SqliteTaskScheduler, Task, TaskLifecycleEvent, TaskScheduler, TaskState,
+};
+
+#[cfg(feature = "storage-sqlite")]
+pub(crate) mod store;

@@ -1,8 +1,7 @@
-//! SQLite persistence. Gated behind `storage-sqlite` so the rest of `easyplanner` stays usable
-//! without linking SQLite (tests or future backends).
+//! SQLite persistence (crate-private). Use [`TaskScheduler`](crate::scheduler::TaskScheduler) from other modules.
 
 mod repository;
 mod sqlite;
 
-pub use repository::{StoreError, TaskRepository, TaskRow, TaskStatus};
-pub use sqlite::SqliteTaskStore;
+pub(crate) use repository::{StoreError, TaskRepository, TaskRow, TaskStatus};
+pub(crate) use sqlite::SqliteTaskStore;

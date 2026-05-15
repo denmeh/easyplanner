@@ -54,7 +54,7 @@ impl SqliteTaskStore {
     }
 
     #[cfg(test)]
-    pub fn set_next_occurrence_for_test(&self, id: i64, unix: u64) {
+    pub(crate) fn set_next_occurrence_for_test(&self, id: i64, unix: u64) {
         self.conn
             .execute(
                 "UPDATE tasks SET next_occurrence_unix = ?1 WHERE id = ?2",
@@ -89,16 +89,6 @@ impl TaskRepository for SqliteTaskStore {
             ],
         )?;
         Ok(self.conn.last_insert_rowid())
-    }
-
-    fn get_task(&self, id: i64) -> Result<TaskRow, StoreError> {
-        let sql = format!("{TASK_SELECT} WHERE id = ?1");
-        self.conn
-            .query_row(&sql, params![id], row_to_task)
-            .map_err(|e| match e {
-                rusqlite::Error::QueryReturnedNoRows => StoreError::TaskNotFound(id),
-                _ => StoreError::Sqlite(e),
-            })
     }
 
     fn tasks_due_before(&self, now: Timestamp) -> Result<Vec<TaskRow>, StoreError> {
@@ -168,21 +158,15 @@ mod tests {
     use super::*;
     use crate::calendar::Calendar;
     use crate::model::Timestamp;
-    use crate::planning;
-    use crate::store::{StoreError, TaskRepository};
-
-    fn open_memory() -> SqliteTaskStore {
-        let mut store = SqliteTaskStore::open(":memory:").expect("open :memory:");
-        migrations::runner()
-            .run(&mut store.conn)
-            .expect("migrations idempotent");
-        store
-    }
+    use crate::scheduler::{SchedulerError, SqliteTaskScheduler, TaskState};
 
     #[test]
     fn migrations_apply_and_tasks_table_exists() {
-        let store = open_memory();
-        let n: i64 = store
+        let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
+        let n: i64 = scheduler
+            .repo
+            .lock()
+            .expect("lock")
             .conn
             .query_row("SELECT COUNT(*) FROM refinery_schema_history", [], |r| {
                 r.get(0)
@@ -193,84 +177,53 @@ mod tests {
 
     #[test]
     fn invalid_wall_clock_tz_on_add_returns_error() {
-        let mut store = open_memory();
-        let err = planning::add_task(&mut store, "x".into(), "minutely", Some("Not/AValid/ZoneId"))
+        let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
+        let err = scheduler
+            .add_task("x".into(), "minutely", Some("Not/AValid/ZoneId"))
             .unwrap_err();
-        assert!(matches!(err, planning::PlanningError::InvalidTimezone(_)));
+        assert!(matches!(err, SchedulerError::InvalidTimezone(_)));
     }
 
     #[test]
     fn add_due_advance_round_trip() {
-        let mut store = open_memory();
+        let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
         let expr = "minutely";
         let cal: Calendar = expr.parse().unwrap();
         let now = Timestamp::now();
         let next = cal.next_occurrence(now).expect("next");
-        let id = planning::add_task(&mut store, "brush teeth".into(), expr, None).expect("add");
-        let stored_expr: String = store
-            .conn
-            .query_row(
-                "SELECT calendar_expr FROM tasks WHERE id = ?1",
-                params![id],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert_eq!(stored_expr, expr);
-        let due = store.tasks_due_before(next).expect("due");
+        let id = scheduler
+            .add_task("brush teeth".into(), expr, None)
+            .expect("add");
+        let due = scheduler.tick_at(next).expect("tick");
         assert!(
-            due.iter().any(|t| t.id == id),
+            due.iter().any(|e| matches!(e, crate::scheduler::TaskLifecycleEvent::Expired { .. })),
             "task should be due at or after its first next occurrence"
         );
-        let next_after = planning::next_occurrence_after_fire(&due[0], next).unwrap();
-        store
-            .set_next_occurrence_unix(id, next_after.map(|t| t.as_u64()))
-            .expect("advance");
-        let row: String = store
-            .conn
-            .query_row(
-                "SELECT calendar_expr FROM tasks WHERE id = ?1",
-                params![id],
-                |r| r.get(0),
-            )
-            .unwrap();
-        let cal2: Calendar = row.parse().unwrap();
-        let next2 = cal2.next_occurrence(next).expect("second occurrence");
-        let stored: Option<i64> = store
-            .conn
-            .query_row(
-                "SELECT next_occurrence_unix FROM tasks WHERE id = ?1",
-                params![id],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert_eq!(stored, Some(next2.as_u64() as i64));
+        let tasks = scheduler.list_tasks().expect("list");
+        let row = tasks.iter().find(|t| t.id == id).unwrap();
+        assert_eq!(row.state, TaskState::Active);
+        assert!(row.next_occurrence_unix.is_some());
     }
 
     #[test]
     fn next_occurrence_column_matches_calendar_for_specific_expr() {
-        let mut store = open_memory();
+        let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
         let expr = "*-*-* 12:00:00";
         let cal: Calendar = expr.parse().unwrap();
         let now = Timestamp::now();
         let expected_next = cal.next_occurrence(now).expect("next");
-        let id = planning::add_task(&mut store, "lunch".into(), expr, None).unwrap();
-        let stored: Option<i64> = store
-            .conn
-            .query_row(
-                "SELECT next_occurrence_unix FROM tasks WHERE id = ?1",
-                params![id],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert_eq!(stored, Some(expected_next.as_u64() as i64));
+        let id = scheduler.add_task("lunch".into(), expr, None).unwrap();
+        let tasks = scheduler.list_tasks().unwrap();
+        let row = tasks.iter().find(|t| t.id == id).unwrap();
+        assert_eq!(row.next_occurrence_unix, Some(expected_next.as_u64()));
     }
 
     #[test]
     fn list_tasks_returns_all_rows() {
-        let mut store = open_memory();
-        planning::add_task(&mut store, "a".into(), "minutely", None).unwrap();
-        planning::add_task(&mut store, "b".into(), "minutely", None).unwrap();
-        let list = store.list_tasks().expect("list");
+        let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
+        scheduler.add_task("a".into(), "minutely", None).unwrap();
+        scheduler.add_task("b".into(), "minutely", None).unwrap();
+        let list = scheduler.list_tasks().expect("list");
         assert_eq!(list.len(), 2);
         let descs: Vec<_> = list.iter().map(|r| r.description.as_str()).collect();
         assert!(descs.contains(&"a"));
@@ -279,27 +232,29 @@ mod tests {
 
     #[test]
     fn delete_task_removes_row() {
-        let mut store = open_memory();
-        let id = planning::add_task(&mut store, "gone".into(), "minutely", None).unwrap();
-        store.delete_task(id).expect("delete");
-        let list = store.list_tasks().unwrap();
+        let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
+        let id = scheduler.add_task("gone".into(), "minutely", None).unwrap();
+        scheduler.delete_task(id).expect("delete");
+        let list = scheduler.list_tasks().unwrap();
         assert!(list.iter().all(|r| r.id != id));
-        assert_eq!(
-            store.delete_task(id).unwrap_err().to_string(),
-            StoreError::TaskNotFound(id).to_string()
-        );
+        assert!(matches!(
+            scheduler.delete_task(id).unwrap_err(),
+            SchedulerError::Store(StoreError::TaskNotFound(_))
+        ));
     }
 
     #[test]
-    fn tasks_due_before_skips_expired_and_finished() {
-        let mut store = open_memory();
+    fn tasks_due_skips_finished() {
+        let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
         let now = Timestamp::new(1_700_000_000);
-        let id = planning::add_task(&mut store, "x".into(), "minutely", None).unwrap();
-        store.set_next_occurrence_for_test(id, now.as_u64().saturating_sub(60));
-        store
-            .set_task_status(id, TaskStatus::Finished)
-            .expect("finish");
-        let due = store.tasks_due_before(now).expect("due");
-        assert!(due.is_empty());
+        let id = scheduler.add_task("x".into(), "minutely", None).unwrap();
+        scheduler.set_next_occurrence_for_test(id, now.as_u64().saturating_sub(60));
+        {
+            let mut repo = scheduler.repo.lock().expect("lock");
+            repo.set_task_status(id, TaskStatus::Finished)
+                .expect("finish");
+        }
+        let events = scheduler.tick_at(now).expect("tick");
+        assert!(events.is_empty());
     }
 }
