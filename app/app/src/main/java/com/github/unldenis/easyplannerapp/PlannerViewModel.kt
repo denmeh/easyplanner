@@ -5,10 +5,14 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.unldenis.easyplanner.PlannerStore
 import com.github.unldenis.easyplanner.PlannerTask
+import com.github.unldenis.easyplannerapp.notifications.TaskReminderNotifications
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -26,6 +30,10 @@ import java.io.File
  *
  * Catching [Throwable] (not only [com.github.unldenis.easyplanner.FfiException]) covers JNI
  * failures that sometimes surface as generic runtime types on ART.
+ *
+ * The Rust background poller is started from the activity while it is at least [androidx.lifecycle.Lifecycle.State.STARTED]
+ * and stopped in `finally` when leaving that state ([MainActivity]); [onCleared] still stops before [PlannerStore.close]
+ * so the native thread joins if the VM is torn down abruptly.
  */
 class PlannerViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -44,6 +52,46 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
 
     fun consumeError() {
         _error.value = null
+    }
+
+    /** Runs JNI on [Dispatchers.Default]; safe to call from [androidx.lifecycle.repeatOnLifecycle]. */
+    suspend fun syncStartSchedulerLoop() =
+        withContext(Dispatchers.Default) {
+            try {
+                store.startSchedulerLoop()
+            } catch (e: Throwable) {
+                _error.value = e.message ?: e.toString()
+            }
+        }
+
+    suspend fun syncStopSchedulerLoop() =
+        withContext(Dispatchers.Default) {
+            try {
+                store.stopSchedulerLoop()
+            } catch (_: Throwable) {
+                // Best-effort on background / teardown.
+            }
+        }
+
+    /**
+     * Drains queued native watcher events ([PlannerStore.pollSchedulerEvents]) and shows
+     * notifications when [TaskReminderNotifications.canPost] allows.
+     */
+    suspend fun pollSchedulerEventsAndNotify() {
+        val events =
+            try {
+                withContext(Dispatchers.Default) {
+                    store.pollSchedulerEvents()
+                }
+            } catch (_: Throwable) {
+                emptyList()
+            }
+        if (events.isEmpty()) return
+
+        val app = getApplication<Application>()
+        withContext(Dispatchers.Main.immediate) {
+            TaskReminderNotifications.notifyForEvents(app, events)
+        }
     }
 
     fun refresh() {
@@ -79,7 +127,13 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     }
 
     override fun onCleared() {
-        super.onCleared()
+        runBlocking(Dispatchers.Default) {
+            try {
+                store.stopSchedulerLoop()
+            } catch (_: Throwable) {
+            }
+        }
         store.close()
+        super.onCleared()
     }
 }

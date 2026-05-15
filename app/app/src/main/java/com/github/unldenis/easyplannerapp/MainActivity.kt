@@ -1,9 +1,14 @@
 package com.github.unldenis.easyplannerapp
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -31,7 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.NavHost
@@ -45,6 +54,8 @@ import com.github.unldenis.easyplannerapp.ui.home.HomeScreen
 import com.github.unldenis.easyplannerapp.ui.settings.SettingsScreen
 import com.github.unldenis.easyplannerapp.ui.theme.EasyPlannerTheme
 import com.github.unldenis.easyplannerapp.ui.theme.ThemeMode
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private object Routes {
@@ -55,6 +66,11 @@ private object Routes {
 
 private const val NavAnimMs = 300
 
+/** Matches the native default poll interval so the list stays in sync when due tasks fire. */
+private const val SchedulerUiRefreshMs = 30_000L
+
+private const val SchedulerEventPollMs = 1_500L
+
 /**
  * Single [androidx.compose.material3.Scaffold] owns the snackbar and bottom navigation so window
  * insets and the snackbar host stay coherent when a tab shows a dialog; stacking another scaffold
@@ -63,7 +79,11 @@ private const val NavAnimMs = 300
  * One [PlannerViewModel] is shared across the [androidx.navigation.compose.NavHost] so Home and
  * Settings use the same [com.github.unldenis.easyplanner.PlannerStore]; the native handle is
  * released from the ViewModel's `onCleared`, not from composable `DisposableEffect`, because the
- * store must outlive individual screens.
+ * store must outlive individual screens. While the activity is at least [androidx.lifecycle.Lifecycle.State.STARTED],
+ * [MainActivity] runs [com.github.unldenis.easyplanner.PlannerStore.startSchedulerLoop] and stops it
+ * when leaving that state; the poller updates SQLite; the UI reloads on a 30s ticker while started.
+ * A faster poll drains [com.github.unldenis.easyplanner.PlannerStore.pollSchedulerEvents] (~1.5s) to
+ * post system notifications when a run fires (needs runtime POST_NOTIFICATIONS on API 33+).
  *
  * Tab [androidx.compose.material3.NavigationBarItem] navigation uses `launchSingleTop` and
  * `restoreState` to avoid duplicate destinations and to keep tab state across configuration
@@ -87,6 +107,47 @@ class MainActivity : ComponentActivity() {
                 val plannerViewModel: PlannerViewModel = viewModel()
                 val tasks by plannerViewModel.tasks.collectAsStateWithLifecycle()
                 val error by plannerViewModel.error.collectAsStateWithLifecycle()
+                val lifecycleOwner = LocalLifecycleOwner.current
+
+                val postNotificationsLauncher =
+                    rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestPermission(),
+                    ) { }
+
+                LaunchedEffect(Unit) {
+                    if (
+                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                        PackageManager.PERMISSION_GRANTED
+                    ) {
+                        postNotificationsLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+
+                LaunchedEffect(lifecycleOwner) {
+                    lifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                        plannerViewModel.syncStartSchedulerLoop()
+                        plannerViewModel.refresh()
+                        try {
+                            coroutineScope {
+                                launch {
+                                    while (true) {
+                                        delay(SchedulerUiRefreshMs)
+                                        plannerViewModel.refresh()
+                                    }
+                                }
+                                launch {
+                                    while (true) {
+                                        delay(SchedulerEventPollMs)
+                                        plannerViewModel.pollSchedulerEventsAndNotify()
+                                    }
+                                }
+                            }
+                        } finally {
+                            plannerViewModel.syncStopSchedulerLoop()
+                        }
+                    }
+                }
 
                 LaunchedEffect(error) {
                     val message = error ?: return@LaunchedEffect

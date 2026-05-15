@@ -27,10 +27,20 @@
     <string name="field_wall_clock_tz_hint">e.g. Europe/Rome — leave empty for UTC</string>
     <string name="task_wall_clock_tz">Wall clock · %1$s</string>
     <string name="task_next_occurrence">Next run · %1$s</string>
+    <string name="task_status_expired">Run due</string>
+    <string name="task_status_expired_body">This run was reached recently. Recurring tasks pick the next slot automatically.</string>
+    <string name="task_status_finished">Finished</string>
+    <string name="task_status_finished_body">No further occurrences are scheduled for this task.</string>
     <string name="settings_appearance">Appearance</string>
     <string name="theme_system">Match system</string>
     <string name="theme_light">Light (neutral)</string>
     <string name="theme_dark">Dark (neutral)</string>
     <string name="content_desc_settings">Settings tab</string>
     <string name="content_desc_navigate_up">Back</string>
+    <string name="notification_channel_tasks_name">Task reminders</string>
+    <string name="notification_channel_tasks_description">Alerts when a task reaches its scheduled time</string>
+    <string name="notification_task_due_title">Due: %1$s</string>
+    <string name="notification_task_due_body">Scheduled run time reached. Open EasyPlanner to review.</string>
+    <string name="notification_task_completed_title">Finished: %1$s</string>
+    <string name="notification_task_completed_body">No further runs are scheduled for this task.</string>
 </resources>

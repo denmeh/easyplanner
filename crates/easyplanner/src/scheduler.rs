@@ -63,7 +63,7 @@ pub struct Task {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskLifecycleEvent {
     Expired { task: Task },
-    Finished { id: i64 },
+    Finished { id: i64, description: String },
 }
 
 /// Owns a [`TaskRepository`] and optionally runs a background loop to process due tasks.
@@ -249,7 +249,7 @@ where
             Ok(DueProcessResult::Expired(expired_row))
         } else {
             repo.set_task_status(task.id, TaskStatus::Finished)?;
-            Ok(DueProcessResult::Finished(task.id))
+            Ok(DueProcessResult::Finished(task.id, task.description.clone()))
         }
     }
 }
@@ -299,7 +299,7 @@ type MutexGuard<'a, T> = std::sync::MutexGuard<'a, T>;
 
 enum DueProcessResult {
     Expired(TaskRow),
-    Finished(i64),
+    Finished(i64, String),
 }
 
 impl TaskLifecycleEvent {
@@ -308,7 +308,7 @@ impl TaskLifecycleEvent {
             DueProcessResult::Expired(row) => Some(Self::Expired {
                 task: Task::from(row),
             }),
-            DueProcessResult::Finished(id) => Some(Self::Finished { id }),
+            DueProcessResult::Finished(id, description) => Some(Self::Finished { id, description }),
         }
     }
 }
