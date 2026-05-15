@@ -1,16 +1,6 @@
 //! JNI surface for the Android app. Keeps BoltFFI types in this crate so the domain library stays
 //! free of `boltffi` and so codegen sees `#[data]` on types defined here.
 //!
-//! [`PlannerTask`] duplicates [`easyplanner::store::TaskRow`] on purpose: with BoltFFI 0.25,
-//! `Vec<TaskRow>` from a path dependency with `#[data]` on `TaskRow` produced invalid Android
-//! bindings (`listTasks` returning `Unit`). A local `#[data]` mirror is the reliable workaround.
-//!
-//! [`PlannerStore`] wraps the SQLite store in a `Mutex` because exported class methods are `&self`
-//! only; interior mutability matches BoltFFI’s threading contract for JNI callers.
-//!
-//! Public methods return `Result<_, String>` so failures surface as Kotlin `FfiException` under the
-//! current `boltffi.toml` (`error_style = "throwing"`).
-
 use std::sync::Mutex;
 
 use boltffi::*;

@@ -4,17 +4,17 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Minimal planner grid: zinc-50 on dark background, centered in safe zone -->
+    <!-- Themed / monochrome launcher: white-only glyph (system tints it) -->
     <path
-        android:fillColor="#FFFAFAFA"
+        android:fillColor="#FFFFFFFF"
         android:pathData="M38,40h14v14h-14z" />
     <path
-        android:fillColor="#FFFAFAFA"
+        android:fillColor="#FFFFFFFF"
         android:pathData="M56,40h14v14h-14z" />
     <path
-        android:fillColor="#FFFAFAFA"
+        android:fillColor="#FFFFFFFF"
         android:pathData="M38,58h14v14h-14z" />
     <path
-        android:fillColor="#FFFAFAFA"
+        android:fillColor="#FFFFFFFF"
         android:pathData="M56,58h14v14h-14z" />
 </vector>
