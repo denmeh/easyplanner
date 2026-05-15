@@ -1,5 +1,5 @@
 //! SQLite persistence. Gated behind `storage-sqlite` so the rest of `easyplanner` stays usable
-//! without linking SQLite (tests, WASM, or future backends).
+//! without linking SQLite (tests or future backends).
 
 mod repository;
 mod sqlite;

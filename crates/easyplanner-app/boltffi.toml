@@ -59,7 +59,7 @@ format = "zip"
 bundle = "unstripped"
 
 [targets.wasm]
-enabled = true
+enabled = false
 triple = "wasm32-unknown-unknown"
 profile = "release"
 output = "dist/wasm"
@@ -72,7 +72,7 @@ output = "dist/wasm"
 package_name = "@denmeh/easyplanner"
 
 [targets.java.jvm]
-enabled = true
+enabled = false
 output = "dist/java"
 strip_symbols = false
 # host_targets = ["current"]

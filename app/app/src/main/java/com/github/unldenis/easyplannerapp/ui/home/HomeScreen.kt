@@ -12,15 +12,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +50,37 @@ private val nextTimeFormat = SimpleDateFormat("EEE, MMM d · HH:mm", Locale.getD
 
 /** Delete dialog keeps primitives so the row object is not held across JNI + list refresh. */
 private data class PendingDelete(val id: Long, val description: String)
+
+private enum class SchedulePreset {
+    Minutely,
+    Hourly,
+    Daily,
+    Weekly,
+    Monthly,
+    Other,
+    ;
+
+    fun toCalendarExpr(): String? =
+        when (this) {
+            Minutely -> "minutely"
+            Hourly -> "hourly"
+            Daily -> "daily"
+            Weekly -> "weekly"
+            Monthly -> "monthly"
+            Other -> null
+        }
+}
+
+@Composable
+private fun SchedulePreset.displayLabel(): String =
+    when (this) {
+        SchedulePreset.Minutely -> stringResource(R.string.schedule_minutely)
+        SchedulePreset.Hourly -> stringResource(R.string.schedule_hourly)
+        SchedulePreset.Daily -> stringResource(R.string.schedule_daily)
+        SchedulePreset.Weekly -> stringResource(R.string.schedule_weekly)
+        SchedulePreset.Monthly -> stringResource(R.string.schedule_monthly)
+        SchedulePreset.Other -> stringResource(R.string.schedule_other)
+    }
 
 /**
  * Task tab: DB work stays in the ViewModel; this layer only renders [tasks] and routes user
@@ -114,8 +148,8 @@ fun HomeScreen(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary,
         ) {
             Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_task))
         }
@@ -166,12 +200,12 @@ private fun TaskCard(
     task: PlannerTask,
     onDelete: () -> Unit,
 ) {
-    Card(
+    OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = CardDefaults.outlinedCardBorder(),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(
@@ -195,7 +229,7 @@ private fun TaskCard(
             Text(
                 text = task.calendarExpr,
                 style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp),
             )
             val zoneLabel = task.wallClockTz?.takeIf { it.isNotBlank() } ?: "UTC"
@@ -231,8 +265,14 @@ private fun AddTaskDialog(
     onConfirm: (String, String, String) -> Unit,
 ) {
     var title by remember { mutableStateOf("") }
-    var schedule by remember { mutableStateOf("minutely") }
+    var preset by remember { mutableStateOf(SchedulePreset.Minutely) }
+    var customSchedule by remember { mutableStateOf("") }
+    var scheduleMenuExpanded by remember { mutableStateOf(false) }
     var wallClockTz by remember { mutableStateOf(ZoneId.systemDefault().id) }
+
+    val resolvedSchedule =
+        preset.toCalendarExpr()?.trim().orEmpty().ifEmpty { customSchedule.trim() }
+    val canSave = title.isNotBlank() && resolvedSchedule.isNotBlank()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -246,14 +286,53 @@ private fun AddTaskDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
-                    value = schedule,
-                    onValueChange = { schedule = it },
-                    label = { Text(stringResource(R.string.field_schedule)) },
-                    supportingText = { Text(stringResource(R.string.field_schedule_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                Box(Modifier.fillMaxWidth()) {
+                    OutlinedTextField(
+                        value = preset.displayLabel(),
+                        onValueChange = {},
+                        readOnly = true,
+                        singleLine = true,
+                        label = { Text(stringResource(R.string.field_schedule)) },
+                        supportingText = {
+                            Text(stringResource(R.string.field_schedule_dropdown_hint))
+                        },
+                        trailingIcon = {
+                            IconButton(onClick = { scheduleMenuExpanded = true }) {
+                                Icon(
+                                    Icons.Default.ArrowDropDown,
+                                    contentDescription = stringResource(R.string.field_schedule),
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    DropdownMenu(
+                        expanded = scheduleMenuExpanded,
+                        onDismissRequest = { scheduleMenuExpanded = false },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        SchedulePreset.entries.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option.displayLabel()) },
+                                onClick = {
+                                    preset = option
+                                    scheduleMenuExpanded = false
+                                },
+                            )
+                        }
+                    }
+                }
+                if (preset == SchedulePreset.Other) {
+                    OutlinedTextField(
+                        value = customSchedule,
+                        onValueChange = { customSchedule = it },
+                        label = { Text(stringResource(R.string.field_custom_schedule)) },
+                        supportingText = { Text(stringResource(R.string.field_schedule_hint)) },
+                        singleLine = false,
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
                 OutlinedTextField(
                     value = wallClockTz,
                     onValueChange = { wallClockTz = it },
@@ -266,8 +345,8 @@ private fun AddTaskDialog(
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(title, schedule, wallClockTz) },
-                enabled = title.isNotBlank() && schedule.isNotBlank(),
+                onClick = { onConfirm(title, resolvedSchedule, wallClockTz) },
+                enabled = canSave,
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {

@@ -14,14 +14,22 @@
     <string name="save">Save</string>
     <string name="field_description">Description</string>
     <string name="field_schedule">Schedule</string>
-    <string name="field_schedule_hint">e.g. minutely or *-*-* 12:00:00</string>
+    <string name="field_schedule_dropdown_hint">Built-in presets or a custom expression.</string>
+    <string name="field_custom_schedule">Custom schedule</string>
+    <string name="field_schedule_hint">e.g. *-*-* 12:00:00 — any expression the engine accepts</string>
+    <string name="schedule_minutely">Every minute</string>
+    <string name="schedule_hourly">Every hour</string>
+    <string name="schedule_daily">Daily</string>
+    <string name="schedule_weekly">Weekly</string>
+    <string name="schedule_monthly">Monthly</string>
+    <string name="schedule_other">Other…</string>
     <string name="field_wall_clock_tz">Wall-clock time zone (IANA)</string>
     <string name="field_wall_clock_tz_hint">e.g. Europe/Rome — leave empty for UTC</string>
     <string name="task_wall_clock_tz">Wall clock · %1$s</string>
     <string name="task_next_occurrence">Next run · %1$s</string>
     <string name="settings_appearance">Appearance</string>
-    <string name="theme_system">System default</string>
-    <string name="theme_light">Light</string>
-    <string name="theme_dark">Dark</string>
+    <string name="theme_system">Match system</string>
+    <string name="theme_light">Light (neutral)</string>
+    <string name="theme_dark">Dark (neutral)</string>
     <string name="content_desc_settings">Settings tab</string>
 </resources>

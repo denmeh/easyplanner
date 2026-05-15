@@ -51,7 +51,7 @@ fun SettingsScreen(
             Text(
                 text = stringResource(R.string.settings_appearance),
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp, top = 8.dp),
             )
             ThemeMode.entries.forEach { mode ->
@@ -75,7 +75,7 @@ fun SettingsScreen(
                         selected = themeMode == mode,
                         onClick = null,
                         colors = RadioButtonDefaults.colors(
-                            selectedColor = MaterialTheme.colorScheme.primary,
+                            selectedColor = MaterialTheme.colorScheme.onSurface,
                         ),
                     )
                     Text(
