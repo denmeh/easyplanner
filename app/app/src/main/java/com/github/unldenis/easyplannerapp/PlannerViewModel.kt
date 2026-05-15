@@ -104,10 +104,54 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun addTask(description: String, calendarExpr: String, wallClockTzIana: String) {
+    fun addTask(
+        title: String,
+        notes: String,
+        calendarExpr: String,
+        wallClockTzIana: String,
+    ) {
         viewModelScope.launch {
             try {
-                store.addTask(description.trim(), calendarExpr.trim(), wallClockTzIana.trim())
+                store.addTask(
+                    title.trim(),
+                    notes.trim(),
+                    calendarExpr.trim(),
+                    wallClockTzIana.trim(),
+                )
+                _tasks.value = store.listTasks()
+            } catch (e: Throwable) {
+                _error.value = e.message ?: e.toString()
+            }
+        }
+    }
+
+    fun updateTask(
+        id: Long,
+        title: String,
+        notes: String,
+        calendarExpr: String,
+        wallClockTzIana: String,
+    ) {
+        viewModelScope.launch {
+            try {
+                store.updateTask(
+                    id,
+                    title.trim(),
+                    notes.trim(),
+                    calendarExpr.trim(),
+                    wallClockTzIana.trim(),
+                )
+                _tasks.value = store.listTasks()
+            } catch (e: Throwable) {
+                _error.value = e.message ?: e.toString()
+            }
+        }
+    }
+
+    fun setTaskEnabled(id: Long, enabled: Boolean) {
+        viewModelScope.launch {
+            try {
+                store.setTaskEnabled(id, enabled)
                 _tasks.value = store.listTasks()
             } catch (e: Throwable) {
                 _error.value = e.message ?: e.toString()

@@ -43,10 +43,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.github.unldenis.easyplannerapp.data.setThemeMode
 import com.github.unldenis.easyplannerapp.data.themeModeFlow
 import com.github.unldenis.easyplannerapp.ui.home.AddTaskScreen
@@ -62,7 +64,13 @@ private object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
     const val ADD_TASK = "add_task"
+    const val EDIT_TASK = "edit_task/{taskId}"
+
+    fun editTask(taskId: Long): String = "edit_task/$taskId"
 }
+
+private fun isTaskEditorRoute(route: String?): Boolean =
+    route == Routes.ADD_TASK || route?.startsWith("edit_task/") == true
 
 private const val NavAnimMs = 300
 
@@ -99,7 +107,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val context = LocalContext.current
             val themeMode by context.themeModeFlow()
-                .collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
+                .collectAsStateWithLifecycle(initialValue = ThemeMode.LIGHT)
             val scope = rememberCoroutineScope()
 
             EasyPlannerTheme(themeMode = themeMode) {
@@ -172,7 +180,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     bottomBar = {
-                        if (currentDestination?.route != Routes.ADD_TASK) {
+                        if (!isTaskEditorRoute(currentDestination?.route)) {
                             NavigationBar(
                                 containerColor = MaterialTheme.colorScheme.surface,
                                 tonalElevation = 0.dp,
@@ -223,7 +231,7 @@ class MainActivity : ComponentActivity() {
                         composable(
                             Routes.HOME,
                             exitTransition = {
-                                if (targetState.destination.route == Routes.ADD_TASK) {
+                                if (isTaskEditorRoute(targetState.destination.route)) {
                                     fadeOut(animationSpec = tween(NavAnimMs)) +
                                         slideOutHorizontally(
                                             animationSpec = tween(NavAnimMs),
@@ -234,7 +242,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             popEnterTransition = {
-                                if (initialState.destination.route == Routes.ADD_TASK) {
+                                if (isTaskEditorRoute(initialState.destination.route)) {
                                     fadeIn(animationSpec = tween(NavAnimMs)) +
                                         slideInHorizontally(
                                             animationSpec = tween(NavAnimMs),
@@ -250,6 +258,11 @@ class MainActivity : ComponentActivity() {
                                 tasks = tasks,
                                 onNavigateToAddTask = {
                                     navController.navigate(Routes.ADD_TASK) {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                onNavigateToEditTask = { taskId ->
+                                    navController.navigate(Routes.editTask(taskId)) {
                                         launchSingleTop = true
                                     }
                                 },
@@ -285,6 +298,37 @@ class MainActivity : ComponentActivity() {
                             AddTaskScreen(
                                 navController = navController,
                                 viewModel = plannerViewModel,
+                                tasks = tasks,
+                                editingTaskId = null,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        composable(
+                            Routes.EDIT_TASK,
+                            arguments = listOf(navArgument("taskId") { type = NavType.LongType }),
+                            enterTransition = {
+                                fadeIn(animationSpec = tween(NavAnimMs)) +
+                                    slideInHorizontally(
+                                        animationSpec = tween(NavAnimMs),
+                                        initialOffsetX = { it },
+                                    )
+                            },
+                            popExitTransition = {
+                                fadeOut(animationSpec = tween(NavAnimMs)) +
+                                    slideOutHorizontally(
+                                        animationSpec = tween(NavAnimMs),
+                                        targetOffsetX = { it },
+                                    )
+                            },
+                        ) { entry ->
+                            val taskId =
+                                entry.arguments?.getLong("taskId")
+                                    ?: error("edit_task requires taskId")
+                            AddTaskScreen(
+                                navController = navController,
+                                viewModel = plannerViewModel,
+                                tasks = tasks,
+                                editingTaskId = taskId,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

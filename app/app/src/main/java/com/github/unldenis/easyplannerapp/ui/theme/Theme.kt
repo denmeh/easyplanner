@@ -1,6 +1,5 @@
 package com.github.unldenis.easyplannerapp.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -64,16 +63,14 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 /**
- * Fixed neutral appearance (shadcn-style zinc). [ThemeMode] still chooses light/dark/system, but
- * wallpaper dynamic color is off so the UI stays minimal and consistent.
+ * Fixed neutral appearance (shadcn-style zinc). Choose light or dark explicitly (no system/wallpaper color).
  */
 @Composable
 fun EasyPlannerTheme(
-    themeMode: ThemeMode = ThemeMode.SYSTEM,
+    themeMode: ThemeMode = ThemeMode.LIGHT,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = when (themeMode) {
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }

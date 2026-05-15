@@ -34,6 +34,9 @@ impl TaskStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TaskRow {
     pub id: i64,
+    /// Short label shown in lists and notifications.
+    pub title: String,
+    /// Optional longer notes (stored in `description` column).
     pub description: String,
     pub calendar_expr: String,
     /// IANA id when the expression has no embedded zone; `None` means UTC.
@@ -60,6 +63,7 @@ pub enum StoreError {
 pub trait TaskRepository {
     fn insert_task(
         &mut self,
+        title: String,
         description: String,
         calendar_expr: &str,
         wall_clock_tz: Option<String>,
@@ -76,9 +80,24 @@ pub trait TaskRepository {
     /// UI / admin listing: full set, `id` order so pagination and stable keys stay predictable.
     fn list_tasks(&self) -> Result<Vec<TaskRow>, StoreError>;
 
+    fn get_task(&self, id: i64) -> Result<Option<TaskRow>, StoreError>;
+
     fn delete_task(&mut self, id: i64) -> Result<(), StoreError>;
 
     fn set_task_status(&mut self, id: i64, status: TaskStatus) -> Result<(), StoreError>;
+
+    fn set_task_enabled(&mut self, id: i64, enabled: bool) -> Result<(), StoreError>;
+
+    fn update_task_content(
+        &mut self,
+        id: i64,
+        title: String,
+        description: String,
+        calendar_expr: &str,
+        wall_clock_tz: Option<String>,
+        next_occurrence_unix: Option<u64>,
+        status: TaskStatus,
+    ) -> Result<(), StoreError>;
 
     fn set_next_occurrence_unix(
         &mut self,

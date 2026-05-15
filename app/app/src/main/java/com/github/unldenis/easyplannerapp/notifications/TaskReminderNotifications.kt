@@ -69,7 +69,7 @@ object TaskReminderNotifications {
                     } else {
                         R.string.notification_task_due_title
                     },
-                    e.description.take(80),
+                    e.title.take(80),
                 )
             val text =
                 appCtx.getString(

@@ -1,11 +1,10 @@
 package com.github.unldenis.easyplannerapp.ui.theme
 
 /**
- * Three-way appearance: [SYSTEM] tracks night mode; fixed light/dark ignore the device toggle so
- * the user can override (e.g. daylight readability or OLED preference) independent of system UI.
+ * Fixed light or dark appearance (no "follow system"). Legacy `system` preference values are
+ * treated as [LIGHT] so upgrades stay predictable.
  */
 enum class ThemeMode {
-    SYSTEM,
     LIGHT,
     DARK,
     ;
@@ -15,9 +14,9 @@ enum class ThemeMode {
     companion object {
         fun fromPreferenceString(raw: String?): ThemeMode =
             when (raw?.lowercase()) {
-                "light" -> LIGHT
                 "dark" -> DARK
-                else -> SYSTEM
+                "light", "system", null, "" -> LIGHT
+                else -> LIGHT
             }
     }
 }

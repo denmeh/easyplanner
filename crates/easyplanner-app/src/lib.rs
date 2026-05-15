@@ -5,7 +5,7 @@ use std::sync::{mpsc, Mutex};
 
 use boltffi::*;
 use easyplanner::{
-    SchedulerError, SqliteTaskScheduler, Task, TaskLifecycleEvent, TaskState,
+    schedule_summary, SchedulerError, SqliteTaskScheduler, Task, TaskLifecycleEvent, TaskState,
 };
 
 /// Wire shape for Kotlin; field layout matches the `tasks` table (see migrations).
@@ -13,8 +13,12 @@ use easyplanner::{
 #[derive(Debug, Clone)]
 pub struct PlannerTask {
     pub id: i64,
+    pub title: String,
+    /// Optional notes (stored in `description` column).
     pub description: String,
     pub calendar_expr: String,
+    /// Human-readable schedule for list cards.
+    pub schedule_summary: String,
     pub wall_clock_tz: Option<String>,
     pub next_occurrence_unix: Option<u64>,
     pub created_at_unix: u64,
@@ -30,7 +34,7 @@ pub struct PlannerSchedulerEvent {
     /// `due` = occurrence reached (recurring or one-shot); `completed` = no further runs.
     pub event_kind: String,
     pub task_id: i64,
-    pub description: String,
+    pub title: String,
 }
 
 fn map_task_state(state: TaskState) -> &'static str {
@@ -42,10 +46,13 @@ fn map_task_state(state: TaskState) -> &'static str {
 }
 
 fn map_task(t: Task) -> PlannerTask {
+    let summary = schedule_summary(&t.calendar_expr);
     PlannerTask {
         id: t.id,
+        title: t.title,
         description: t.description,
         calendar_expr: t.calendar_expr,
+        schedule_summary: summary,
         wall_clock_tz: t.wall_clock_tz,
         next_occurrence_unix: t.next_occurrence_unix,
         created_at_unix: t.created_at_unix,
@@ -59,12 +66,12 @@ fn map_scheduler_event(ev: TaskLifecycleEvent) -> PlannerSchedulerEvent {
         TaskLifecycleEvent::Expired { task } => PlannerSchedulerEvent {
             event_kind: "due".to_string(),
             task_id: task.id,
-            description: task.description,
+            title: task.title,
         },
-        TaskLifecycleEvent::Finished { id, description } => PlannerSchedulerEvent {
+        TaskLifecycleEvent::Finished { id, title } => PlannerSchedulerEvent {
             event_kind: "completed".to_string(),
             task_id: id,
-            description,
+            title,
         },
     }
 }
@@ -143,10 +150,11 @@ impl PlannerStore {
         Ok(rows.into_iter().map(map_task).collect())
     }
 
-    /// `wall_clock_tz`: IANA id when `calendar_expr` has no embedded timezone. Empty string uses UTC.
+    /// `notes`: optional detail text (stored in `description` column). `wall_clock_tz`: IANA id when `calendar_expr` has no embedded timezone. Empty string uses UTC.
     pub fn add_task(
         &self,
-        description: String,
+        title: String,
+        notes: String,
         calendar_expr: String,
         wall_clock_tz: String,
     ) -> Result<i64, String> {
@@ -154,8 +162,33 @@ impl PlannerStore {
         let tz = wall_clock_tz.trim();
         let tz_opt = if tz.is_empty() { None } else { Some(tz) };
         guard
-            .add_task(description, &calendar_expr, tz_opt)
+            .add_task(title, notes, &calendar_expr, tz_opt)
             .map_err(|e| e.to_string())
+    }
+
+    pub fn update_task(
+        &self,
+        id: i64,
+        title: String,
+        notes: String,
+        calendar_expr: String,
+        wall_clock_tz: String,
+    ) -> Result<i64, String> {
+        let guard = self.inner.lock().map_err(|e| e.to_string())?;
+        let tz = wall_clock_tz.trim();
+        let tz_opt = if tz.is_empty() { None } else { Some(tz) };
+        guard
+            .update_task(id, title, notes, &calendar_expr, tz_opt)
+            .map_err(|e| e.to_string())?;
+        Ok(1)
+    }
+
+    pub fn set_task_enabled(&self, id: i64, enabled: bool) -> Result<i64, String> {
+        let guard = self.inner.lock().map_err(|e| e.to_string())?;
+        guard
+            .set_task_enabled(id, enabled)
+            .map_err(|e| e.to_string())?;
+        Ok(1)
     }
 
     /// Returns `1` on success. `Result<(), String>` crashes BoltFFI Android JNI on `Ok(())`; see https://github.com/boltffi/boltffi/issues/308

@@ -22,6 +22,19 @@ internal enum class SchedulePreset {
             Monthly -> "monthly"
             Other -> null
         }
+
+    companion object {
+        /** Maps a stored expression to a built-in preset when it matches exactly (case-insensitive). */
+        fun fromCalendarExpr(expr: String): Pair<SchedulePreset, String> {
+            val trimmed = expr.trim()
+            val lower = trimmed.lowercase()
+            for (p in listOf(Minutely, Hourly, Daily, Weekly, Monthly)) {
+                val e = p.toCalendarExpr()
+                if (e != null && e == lower) return p to trimmed
+            }
+            return Other to trimmed
+        }
+    }
 }
 
 @Composable

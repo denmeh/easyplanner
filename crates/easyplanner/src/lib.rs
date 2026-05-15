@@ -9,7 +9,8 @@ pub mod scheduler;
 
 #[cfg(feature = "storage-sqlite")]
 pub use scheduler::{
-    SchedulerError, SqliteTaskScheduler, Task, TaskLifecycleEvent, TaskScheduler, TaskState,
+    schedule_summary, SchedulerError, SqliteTaskScheduler, Task, TaskLifecycleEvent, TaskScheduler,
+    TaskState,
 };
 
 #[cfg(feature = "storage-sqlite")]

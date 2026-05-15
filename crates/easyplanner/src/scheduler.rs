@@ -36,6 +36,8 @@ pub enum SchedulerError {
     WatcherAlreadyRunning,
     #[error("repository lock poisoned")]
     MutexPoisoned,
+    #[error("cannot modify finished task: {0}")]
+    TaskFinished(i64),
 }
 
 /// Lifecycle state exposed to hosts (maps the persisted `status` column).
@@ -50,6 +52,8 @@ pub enum TaskState {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Task {
     pub id: i64,
+    pub title: String,
+    /// Optional notes (persisted in the `description` column).
     pub description: String,
     pub calendar_expr: String,
     pub wall_clock_tz: Option<String>,
@@ -63,7 +67,7 @@ pub struct Task {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskLifecycleEvent {
     Expired { task: Task },
-    Finished { id: i64, description: String },
+    Finished { id: i64, title: String },
 }
 
 /// Owns a [`TaskRepository`] and optionally runs a background loop to process due tasks.
@@ -95,7 +99,8 @@ where
     /// Persists a task after validating `calendar_expr` and computing the first run time.
     pub fn add_task(
         &self,
-        description: String,
+        title: String,
+        notes: String,
         calendar_expr: &str,
         wall_clock_tz_iana: Option<&str>,
     ) -> Result<i64, SchedulerError> {
@@ -106,7 +111,8 @@ where
         let now = Timestamp::now();
         let next = calendar.next_occurrence_with_default_tz(now, default_tz);
         Ok(repo.insert_task(
-            description,
+            title,
+            notes,
             calendar_expr,
             stored_tz,
             next.map(|t| t.as_u64()),
@@ -114,6 +120,60 @@ where
             true,
             TaskStatus::Active,
         )?)
+    }
+
+    /// Disables or re-enables a task. Re-enabling recomputes the next run from `now` and sets status active.
+    pub fn set_task_enabled(&self, id: i64, enabled: bool) -> Result<(), SchedulerError> {
+        let mut repo = self.lock_repo()?;
+        let Some(row) = repo.get_task(id)? else {
+            return Err(StoreError::TaskNotFound(id).into());
+        };
+        if row.status == TaskStatus::Finished {
+            return Err(SchedulerError::TaskFinished(id));
+        }
+        repo.set_task_enabled(id, enabled)?;
+        if enabled {
+            let default_tz = wall_tz_from_stored(row.wall_clock_tz.as_deref())?;
+            let calendar: Calendar = row.calendar_expr.parse()?;
+            let now = Timestamp::now();
+            let next = calendar.next_occurrence_with_default_tz(now, default_tz);
+            repo.set_next_occurrence_unix(id, next.map(|t| t.as_u64()))?;
+            repo.set_task_status(id, TaskStatus::Active)?;
+        }
+        Ok(())
+    }
+
+    /// Updates content and schedule for a non-finished task; recomputes next occurrence from `now`.
+    pub fn update_task(
+        &self,
+        id: i64,
+        title: String,
+        notes: String,
+        calendar_expr: &str,
+        wall_clock_tz_iana: Option<&str>,
+    ) -> Result<(), SchedulerError> {
+        let mut repo = self.lock_repo()?;
+        let Some(row) = repo.get_task(id)? else {
+            return Err(StoreError::TaskNotFound(id).into());
+        };
+        if row.status == TaskStatus::Finished {
+            return Err(SchedulerError::TaskFinished(id));
+        }
+        let stored_tz = normalize_wall_clock_tz(wall_clock_tz_iana);
+        let default_tz = wall_tz_from_stored(stored_tz.as_deref())?;
+        let calendar: Calendar = calendar_expr.parse()?;
+        let now = Timestamp::now();
+        let next = calendar.next_occurrence_with_default_tz(now, default_tz);
+        repo.update_task_content(
+            id,
+            title,
+            notes,
+            calendar_expr,
+            stored_tz,
+            next.map(|t| t.as_u64()),
+            TaskStatus::Active,
+        )?;
+        Ok(())
     }
 
     pub fn list_tasks(&self) -> Result<Vec<Task>, SchedulerError> {
@@ -249,7 +309,7 @@ where
             Ok(DueProcessResult::Expired(expired_row))
         } else {
             repo.set_task_status(task.id, TaskStatus::Finished)?;
-            Ok(DueProcessResult::Finished(task.id, task.description.clone()))
+            Ok(DueProcessResult::Finished(task.id, task.title.clone()))
         }
     }
 }
@@ -308,7 +368,7 @@ impl TaskLifecycleEvent {
             DueProcessResult::Expired(row) => Some(Self::Expired {
                 task: Task::from(row),
             }),
-            DueProcessResult::Finished(id, description) => Some(Self::Finished { id, description }),
+            DueProcessResult::Finished(id, title) => Some(Self::Finished { id, title }),
         }
     }
 }
@@ -317,6 +377,7 @@ impl Task {
     fn from(row: TaskRow) -> Self {
         Self {
             id: row.id,
+            title: row.title,
             description: row.description,
             calendar_expr: row.calendar_expr,
             wall_clock_tz: row.wall_clock_tz,
@@ -353,6 +414,14 @@ fn wall_tz_from_stored(stored: Option<&str>) -> Result<Tz, SchedulerError> {
     }
 }
 
+/// Human-readable schedule line for UI; falls back to the raw expression if parsing fails.
+pub fn schedule_summary(calendar_expr: &str) -> String {
+    match calendar_expr.parse::<Calendar>() {
+        Ok(cal) => cal.to_human_readable(true),
+        Err(_) => calendar_expr.to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -365,7 +434,7 @@ mod tests {
                 .unwrap();
         let now = Timestamp::new(1_700_000_000);
         let id = scheduler
-            .add_task("repeat".into(), "minutely", None)
+            .add_task("repeat".into(), String::new(), "minutely", None)
             .unwrap();
         scheduler.set_next_occurrence_for_test(id, now.as_u64().saturating_sub(120));
 
@@ -392,7 +461,9 @@ mod tests {
         let scheduler = SqliteTaskScheduler::open(":memory:").unwrap();
         let expr = "2020-01-01 08:00:00";
         let fired_at = Timestamp::new(1_577_880_000);
-        let id = scheduler.add_task("once".into(), expr, None).unwrap();
+        let id = scheduler
+            .add_task("once".into(), String::new(), expr, None)
+            .unwrap();
         scheduler.set_next_occurrence_for_test(id, fired_at.as_u64());
 
         let events = scheduler
@@ -417,7 +488,9 @@ mod tests {
             SqliteTaskScheduler::open_with_poll_interval(":memory:", Duration::from_millis(50))
                 .unwrap();
         let now = Timestamp::new(1_700_000_000);
-        let id = scheduler.add_task("due".into(), "minutely", None).unwrap();
+        let id = scheduler
+            .add_task("due".into(), String::new(), "minutely", None)
+            .unwrap();
         scheduler.set_next_occurrence_for_test(id, now.as_u64().saturating_sub(120));
 
         let rx = scheduler.start_watcher().expect("start");
