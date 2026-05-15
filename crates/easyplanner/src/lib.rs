@@ -6,3 +6,9 @@ pub mod model;
 
 #[cfg(feature = "storage-sqlite")]
 pub mod store;
+
+#[cfg(feature = "storage-sqlite")]
+pub mod planning;
+
+#[cfg(feature = "storage-sqlite")]
+pub mod scheduler;

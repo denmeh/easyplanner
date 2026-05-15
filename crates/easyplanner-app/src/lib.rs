@@ -4,6 +4,7 @@
 use std::sync::Mutex;
 
 use boltffi::*;
+use easyplanner::planning;
 use easyplanner::store::{SqliteTaskStore, TaskRepository, TaskRow};
 
 /// Wire shape for Kotlin; field layout matches the `tasks` table (see migrations).
@@ -63,8 +64,7 @@ impl PlannerStore {
         let mut guard = self.inner.lock().map_err(|e| e.to_string())?;
         let tz = wall_clock_tz.trim();
         let tz_opt = if tz.is_empty() { None } else { Some(tz) };
-        guard
-            .add_task(description, &calendar_expr, tz_opt)
+        planning::add_task(&mut *guard, description, &calendar_expr, tz_opt)
             .map_err(|e| e.to_string())
     }
 

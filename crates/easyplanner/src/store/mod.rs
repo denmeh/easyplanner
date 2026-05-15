@@ -4,5 +4,5 @@
 mod repository;
 mod sqlite;
 
-pub use repository::{StoreError, TaskRepository, TaskRow};
+pub use repository::{StoreError, TaskRepository, TaskRow, TaskStatus};
 pub use sqlite::SqliteTaskStore;
