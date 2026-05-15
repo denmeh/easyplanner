@@ -184,6 +184,7 @@ name = "easyplanner-app"
 version = "0.1.0"
 dependencies = [
  "boltffi",
+ "easyplanner",
 ]
 
 [[package]]

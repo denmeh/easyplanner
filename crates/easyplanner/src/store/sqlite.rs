@@ -1,4 +1,7 @@
 //! SQLite implementation of [`TaskRepository`](super::repository::TaskRepository).
+//!
+//! WAL + foreign keys on open: WAL reduces writer/reader contention for a single-file mobile DB;
+//! foreign keys guard referential integrity if the schema grows relations later.
 
 use std::path::Path;
 
@@ -18,7 +21,8 @@ pub struct SqliteTaskStore {
 }
 
 impl SqliteTaskStore {
-    /// Open (or create) the database at `path` and apply pending migrations.
+    /// Creates the file if missing, runs embedded migrations once, then returns a handle.
+    /// Callers choose `path` (e.g. app `filesDir`) so tests can use `:memory:` without env wiring.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, StoreError> {
         let mut conn = Connection::open(path.as_ref())?;
         conn.execute_batch(
@@ -52,6 +56,7 @@ impl TaskRepository for SqliteTaskStore {
 
     fn tasks_due_before(&self, now: Timestamp) -> Result<Vec<TaskRow>, StoreError> {
         let mut stmt = self.conn.prepare(
+            // Partial index idx_tasks_due matches this predicate; order is fire-time, not id.
             "SELECT id, description, calendar_expr, next_occurrence_unix, created_at_unix, enabled
              FROM tasks
              WHERE enabled = 1
@@ -74,7 +79,41 @@ impl TaskRepository for SqliteTaskStore {
         Ok(rows)
     }
 
+    fn list_tasks(&self) -> Result<Vec<TaskRow>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            // Stable key order: matches typical `ORDER BY id` expectations for UI lists and tests.
+            "SELECT id, description, calendar_expr, next_occurrence_unix, created_at_unix, enabled
+             FROM tasks
+             ORDER BY id ASC",
+        )?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok(TaskRow {
+                    id: row.get(0)?,
+                    description: row.get(1)?,
+                    calendar_expr: row.get(2)?,
+                    next_occurrence_unix: row.get::<_, Option<i64>>(3)?.map(|v| v as u64),
+                    created_at_unix: row.get::<_, i64>(4)? as u64,
+                    enabled: row.get::<_, i64>(5)? != 0,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    fn delete_task(&mut self, id: i64) -> Result<(), StoreError> {
+        // Distinguish "no row" from silent success so callers can show a real error instead of guessing.
+        let n = self
+            .conn
+            .execute("DELETE FROM tasks WHERE id = ?1", params![id])?;
+        if n == 0 {
+            return Err(StoreError::TaskNotFound(id));
+        }
+        Ok(())
+    }
+
     fn advance_task_after_fire(&mut self, id: i64, fired_at: Timestamp) -> Result<(), StoreError> {
+        // Re-read stored expression: the calendar type is not serialized except as this string.
         let calendar_expr: String = self
             .conn
             .query_row(
@@ -103,7 +142,7 @@ impl TaskRepository for SqliteTaskStore {
 mod tests {
     use super::*;
     use crate::calendar::Calendar;
-    use crate::store::TaskRepository;
+    use crate::store::{StoreError, TaskRepository};
 
     fn open_memory() -> SqliteTaskStore {
         let mut store = SqliteTaskStore::open(":memory:").expect("open :memory:");
@@ -186,5 +225,30 @@ mod tests {
             )
             .unwrap();
         assert_eq!(stored, Some(expected_next.as_u64() as i64));
+    }
+
+    #[test]
+    fn list_tasks_returns_all_rows() {
+        let mut store = open_memory();
+        store.add_task("a".into(), "minutely").unwrap();
+        store.add_task("b".into(), "minutely").unwrap();
+        let list = store.list_tasks().expect("list");
+        assert_eq!(list.len(), 2);
+        let descs: Vec<_> = list.iter().map(|r| r.description.as_str()).collect();
+        assert!(descs.contains(&"a"));
+        assert!(descs.contains(&"b"));
+    }
+
+    #[test]
+    fn delete_task_removes_row() {
+        let mut store = open_memory();
+        let id = store.add_task("gone".into(), "minutely").unwrap();
+        store.delete_task(id).expect("delete");
+        let list = store.list_tasks().unwrap();
+        assert!(list.iter().all(|r| r.id != id));
+        assert_eq!(
+            store.delete_task(id).unwrap_err().to_string(),
+            StoreError::TaskNotFound(id).to_string()
+        );
     }
 }

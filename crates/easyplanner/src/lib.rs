@@ -1,3 +1,6 @@
+//! Core planner library: recurrence parsing, timestamps, and optional SQLite persistence.
+//! UI and FFI live in other crates so this stays usable from tests and non-Android targets.
+
 pub mod calendar;
 pub mod model;
 

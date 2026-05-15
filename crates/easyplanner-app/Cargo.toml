@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 boltffi = { workspace = true }
+easyplanner = { path = "../easyplanner", features = ["storage-sqlite"] }
 
 [lib]
 crate-type = ["cdylib", "staticlib"]

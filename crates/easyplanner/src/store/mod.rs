@@ -1,7 +1,5 @@
-//! Task persistence behind [`TaskRepository`].
-//!
-//! Import the trait to call `add_task` / `tasks_due_before` / `advance_task_after_fire` on a concrete store:
-//! `use easyplanner::store::{SqliteTaskStore, TaskRepository};`
+//! SQLite persistence. Gated behind `storage-sqlite` so the rest of `easyplanner` stays usable
+//! without linking SQLite (tests, WASM, or future backends).
 
 mod repository;
 mod sqlite;
