@@ -56,10 +56,10 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun addTask(description: String, calendarExpr: String) {
+    fun addTask(description: String, calendarExpr: String, wallClockTzIana: String) {
         viewModelScope.launch {
             try {
-                store.addTask(description.trim(), calendarExpr.trim())
+                store.addTask(description.trim(), calendarExpr.trim(), wallClockTzIana.trim())
                 _tasks.value = store.listTasks()
             } catch (e: Throwable) {
                 _error.value = e.message ?: e.toString()

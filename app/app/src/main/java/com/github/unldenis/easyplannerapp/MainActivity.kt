@@ -38,7 +38,8 @@ import com.github.unldenis.easyplannerapp.ui.theme.EasyPlannerTheme
 import com.github.unldenis.easyplannerapp.ui.theme.ThemeMode
 import kotlinx.coroutines.launch
 
-private object Routes {    const val HOME = "home"
+private object Routes {
+    const val HOME = "home"
     const val SETTINGS = "settings"
 }
 

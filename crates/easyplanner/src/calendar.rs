@@ -23,7 +23,8 @@ pub struct Calendar {
     minute: TimeComponent<0, 59>,
     /// Second component (can be * or 0-59)
     second: TimeComponent<0, 59>,
-    /// Timezone (can be None, implies UTC)
+    /// Optional IANA zone parsed from the expression tail; when `None`, wall-clock matching uses
+    /// the store / caller-provided default in [`Calendar::next_occurrence_with_default_tz`].
     timezone: Option<chrono_tz::Tz>,
 }
 
@@ -594,12 +595,25 @@ impl Calendar {
 }
 
 impl Calendar {
+    /// Next occurrence using **UTC** when this calendar has no embedded timezone (library default).
+    #[must_use]
     pub fn next_occurrence(&self, from: Timestamp) -> Option<Timestamp> {
-        let timezone = self.timezone.as_ref().unwrap_or(&chrono_tz::Tz::UTC);
+        self.next_occurrence_with_default_tz(from, chrono_tz::Tz::UTC)
+    }
+
+    /// Next occurrence; if the parsed calendar has no `timezone`, `default_wall_tz` is used for
+    /// civil date/time matching (matches the Android “effective” IANA zone from settings).
+    #[must_use]
+    pub fn next_occurrence_with_default_tz(
+        &self,
+        from: Timestamp,
+        default_wall_tz: chrono_tz::Tz,
+    ) -> Option<Timestamp> {
+        let timezone = self.timezone.unwrap_or(default_wall_tz);
 
         let from = DateTime::from_timestamp(from.as_u64() as i64, 0)
             .expect("Invalid timestamp")
-            .with_timezone(timezone);
+            .with_timezone(&timezone);
 
         let is_leap_year = |year: u32| {
             year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
@@ -668,7 +682,7 @@ impl Calendar {
                     NaiveDate::from_ymd_opt(y as i32, m, d).expect("Invalid date"),
                     NaiveTime::from_hms_opt(h, mi, s).expect("Invalid time"),
                 )
-                .and_local_timezone(*timezone)
+                .and_local_timezone(timezone)
                 .earliest()
             })
             .map(|dt| Timestamp::new(dt.timestamp() as u64))
@@ -1073,6 +1087,25 @@ mod tests {
             chrono::DateTime::from_timestamp(next_occurrence.unwrap().as_u64() as i64, 0)
                 .unwrap()
                 .with_timezone(&chrono_tz::Europe::Rome)
+        );
+    }
+
+    #[test]
+    fn next_occurrence_default_wall_tz_differs_from_utc_for_date_only_expr() {
+        let cal: Calendar = "*-*-* 12:00:00".parse().unwrap();
+        assert!(cal.timezone.is_none());
+        // 2025-01-01 00:00:00 UTC (CET = UTC+1)
+        let from = Timestamp::new(1_735_689_600);
+        let utc = cal
+            .next_occurrence_with_default_tz(from, chrono_tz::Tz::UTC)
+            .expect("utc");
+        let rome = cal
+            .next_occurrence_with_default_tz(from, chrono_tz::Europe::Rome)
+            .expect("rome");
+        assert_eq!(
+            utc.as_u64() - rome.as_u64(),
+            3600,
+            "noon Rome is one hour before noon UTC on this date"
         );
     }
 

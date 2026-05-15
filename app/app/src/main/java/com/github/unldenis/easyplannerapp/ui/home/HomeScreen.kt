@@ -39,6 +39,7 @@ import com.github.unldenis.easyplanner.PlannerTask
 import com.github.unldenis.easyplannerapp.PlannerViewModel
 import com.github.unldenis.easyplannerapp.R
 import java.text.SimpleDateFormat
+import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
@@ -123,8 +124,8 @@ fun HomeScreen(
     if (showAdd) {
         AddTaskDialog(
             onDismiss = { showAdd = false },
-            onConfirm = { title, schedule ->
-                viewModel.addTask(title, schedule)
+            onConfirm = { title, schedule, wallClockTz ->
+                viewModel.addTask(title, schedule, wallClockTz)
                 showAdd = false
             },
         )
@@ -197,6 +198,13 @@ private fun TaskCard(
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            val zoneLabel = task.wallClockTz?.takeIf { it.isNotBlank() } ?: "UTC"
+            Text(
+                text = stringResource(R.string.task_wall_clock_tz, zoneLabel),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 2.dp),
+            )
             Text(
                 text = stringResource(
                     R.string.task_next_occurrence,
@@ -220,10 +228,11 @@ private fun formatNext(epoch: ULong?): String =
 @Composable
 private fun AddTaskDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String) -> Unit,
+    onConfirm: (String, String, String) -> Unit,
 ) {
     var title by remember { mutableStateOf("") }
     var schedule by remember { mutableStateOf("minutely") }
+    var wallClockTz by remember { mutableStateOf(ZoneId.systemDefault().id) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -245,11 +254,19 @@ private fun AddTaskDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                OutlinedTextField(
+                    value = wallClockTz,
+                    onValueChange = { wallClockTz = it },
+                    label = { Text(stringResource(R.string.field_wall_clock_tz)) },
+                    supportingText = { Text(stringResource(R.string.field_wall_clock_tz_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(title, schedule) },
+                onClick = { onConfirm(title, schedule, wallClockTz) },
                 enabled = title.isNotBlank() && schedule.isNotBlank(),
             ) { Text(stringResource(R.string.save)) }
         },

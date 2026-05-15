@@ -23,6 +23,7 @@ pub struct PlannerTask {
     pub id: i64,
     pub description: String,
     pub calendar_expr: String,
+    pub wall_clock_tz: Option<String>,
     pub next_occurrence_unix: Option<u64>,
     pub created_at_unix: u64,
     pub enabled: bool,
@@ -33,6 +34,7 @@ fn map_row(r: TaskRow) -> PlannerTask {
         id: r.id,
         description: r.description,
         calendar_expr: r.calendar_expr,
+        wall_clock_tz: r.wall_clock_tz,
         next_occurrence_unix: r.next_occurrence_unix,
         created_at_unix: r.created_at_unix,
         enabled: r.enabled,
@@ -61,10 +63,18 @@ impl PlannerStore {
         Ok(rows.into_iter().map(map_row).collect())
     }
 
-    pub fn add_task(&self, description: String, calendar_expr: String) -> Result<i64, String> {
+    /// `wall_clock_tz`: IANA id when `calendar_expr` has no embedded timezone. Empty string uses UTC.
+    pub fn add_task(
+        &self,
+        description: String,
+        calendar_expr: String,
+        wall_clock_tz: String,
+    ) -> Result<i64, String> {
         let mut guard = self.inner.lock().map_err(|e| e.to_string())?;
+        let tz = wall_clock_tz.trim();
+        let tz_opt = if tz.is_empty() { None } else { Some(tz) };
         guard
-            .add_task(description, &calendar_expr)
+            .add_task(description, &calendar_expr, tz_opt)
             .map_err(|e| e.to_string())
     }
 

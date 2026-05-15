@@ -10,7 +10,7 @@ import com.github.unldenis.easyplannerapp.ui.theme.ThemeMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
-/** Theme uses DataStore so it survives process death; a dedicated store name avoids key clashes later. */
+/** Theme prefs in DataStore; survives process death. */
 private val Context.themeDataStore: DataStore<Preferences> by preferencesDataStore(name = "easy_planner_theme")
 
 private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")

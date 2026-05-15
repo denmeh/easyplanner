@@ -8,12 +8,29 @@ use std::path::Path;
 use refinery::embed_migrations;
 use rusqlite::{Connection, params};
 
+use chrono_tz::Tz;
+
 use crate::calendar::Calendar;
 use crate::model::Timestamp;
 
 use super::repository::{StoreError, TaskRepository, TaskRow};
 
 embed_migrations!("migrations");
+
+fn normalize_wall_clock_tz(raw: Option<&str>) -> Option<String> {
+    raw.map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(std::string::ToString::to_string)
+}
+
+fn wall_tz_from_stored(stored: Option<String>) -> Result<Tz, StoreError> {
+    match stored.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        None => Ok(Tz::UTC),
+        Some(s) => s
+            .parse()
+            .map_err(|_| StoreError::InvalidTimezone(s.to_string())),
+    }
+}
 
 /// SQLite-backed [`TaskRepository`].
 pub struct SqliteTaskStore {
@@ -37,16 +54,25 @@ impl SqliteTaskStore {
 }
 
 impl TaskRepository for SqliteTaskStore {
-    fn add_task(&mut self, description: String, calendar_expr: &str) -> Result<i64, StoreError> {
+    fn add_task(
+        &mut self,
+        description: String,
+        calendar_expr: &str,
+        wall_clock_tz_iana: Option<&str>,
+    ) -> Result<i64, StoreError> {
+        let stored_tz = normalize_wall_clock_tz(wall_clock_tz_iana);
+        let default_tz = wall_tz_from_stored(stored_tz.clone())?;
+
         let calendar: Calendar = calendar_expr.parse()?;
         let now = Timestamp::now();
-        let next = calendar.next_occurrence(now);
+        let next = calendar.next_occurrence_with_default_tz(now, default_tz);
         self.conn.execute(
-            "INSERT INTO tasks (description, calendar_expr, next_occurrence_unix, created_at_unix, enabled)
-             VALUES (?1, ?2, ?3, ?4, 1)",
+            "INSERT INTO tasks (description, calendar_expr, wall_clock_tz, next_occurrence_unix, created_at_unix, enabled)
+             VALUES (?1, ?2, ?3, ?4, ?5, 1)",
             params![
                 description,
                 calendar_expr,
+                stored_tz,
                 next.map(|t| t.as_u64() as i64),
                 now.as_u64() as i64,
             ],
@@ -57,7 +83,7 @@ impl TaskRepository for SqliteTaskStore {
     fn tasks_due_before(&self, now: Timestamp) -> Result<Vec<TaskRow>, StoreError> {
         let mut stmt = self.conn.prepare(
             // Partial index idx_tasks_due matches this predicate; order is fire-time, not id.
-            "SELECT id, description, calendar_expr, next_occurrence_unix, created_at_unix, enabled
+            "SELECT id, description, calendar_expr, wall_clock_tz, next_occurrence_unix, created_at_unix, enabled
              FROM tasks
              WHERE enabled = 1
                AND next_occurrence_unix IS NOT NULL
@@ -70,9 +96,10 @@ impl TaskRepository for SqliteTaskStore {
                     id: row.get(0)?,
                     description: row.get(1)?,
                     calendar_expr: row.get(2)?,
-                    next_occurrence_unix: row.get::<_, Option<i64>>(3)?.map(|v| v as u64),
-                    created_at_unix: row.get::<_, i64>(4)? as u64,
-                    enabled: row.get::<_, i64>(5)? != 0,
+                    wall_clock_tz: row.get(3)?,
+                    next_occurrence_unix: row.get::<_, Option<i64>>(4)?.map(|v| v as u64),
+                    created_at_unix: row.get::<_, i64>(5)? as u64,
+                    enabled: row.get::<_, i64>(6)? != 0,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -82,7 +109,7 @@ impl TaskRepository for SqliteTaskStore {
     fn list_tasks(&self) -> Result<Vec<TaskRow>, StoreError> {
         let mut stmt = self.conn.prepare(
             // Stable key order: matches typical `ORDER BY id` expectations for UI lists and tests.
-            "SELECT id, description, calendar_expr, next_occurrence_unix, created_at_unix, enabled
+            "SELECT id, description, calendar_expr, wall_clock_tz, next_occurrence_unix, created_at_unix, enabled
              FROM tasks
              ORDER BY id ASC",
         )?;
@@ -92,9 +119,10 @@ impl TaskRepository for SqliteTaskStore {
                     id: row.get(0)?,
                     description: row.get(1)?,
                     calendar_expr: row.get(2)?,
-                    next_occurrence_unix: row.get::<_, Option<i64>>(3)?.map(|v| v as u64),
-                    created_at_unix: row.get::<_, i64>(4)? as u64,
-                    enabled: row.get::<_, i64>(5)? != 0,
+                    wall_clock_tz: row.get(3)?,
+                    next_occurrence_unix: row.get::<_, Option<i64>>(4)?.map(|v| v as u64),
+                    created_at_unix: row.get::<_, i64>(5)? as u64,
+                    enabled: row.get::<_, i64>(6)? != 0,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -113,20 +141,20 @@ impl TaskRepository for SqliteTaskStore {
     }
 
     fn advance_task_after_fire(&mut self, id: i64, fired_at: Timestamp) -> Result<(), StoreError> {
-        // Re-read stored expression: the calendar type is not serialized except as this string.
-        let calendar_expr: String = self
+        let (calendar_expr, wall_clock_stored): (String, Option<String>) = self
             .conn
             .query_row(
-                "SELECT calendar_expr FROM tasks WHERE id = ?1",
+                "SELECT calendar_expr, wall_clock_tz FROM tasks WHERE id = ?1",
                 params![id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?)),
             )
             .map_err(|e| match e {
                 rusqlite::Error::QueryReturnedNoRows => StoreError::TaskNotFound(id),
                 _ => StoreError::Sqlite(e),
             })?;
+        let default_tz = wall_tz_from_stored(wall_clock_stored)?;
         let calendar: Calendar = calendar_expr.parse()?;
-        let next = calendar.next_occurrence(fired_at);
+        let next = calendar.next_occurrence_with_default_tz(fired_at, default_tz);
         let n = self.conn.execute(
             "UPDATE tasks SET next_occurrence_unix = ?1 WHERE id = ?2",
             params![next.map(|t| t.as_u64() as i64), id],
@@ -142,6 +170,7 @@ impl TaskRepository for SqliteTaskStore {
 mod tests {
     use super::*;
     use crate::calendar::Calendar;
+    use crate::model::Timestamp;
     use crate::store::{StoreError, TaskRepository};
 
     fn open_memory() -> SqliteTaskStore {
@@ -165,13 +194,24 @@ mod tests {
     }
 
     #[test]
+    fn invalid_wall_clock_tz_on_add_returns_error() {
+        let mut store = open_memory();
+        let err = store
+            .add_task("x".into(), "minutely", Some("Not/AValid/ZoneId"))
+            .unwrap_err();
+        assert!(matches!(err, StoreError::InvalidTimezone(_)));
+    }
+
+    #[test]
     fn add_due_advance_round_trip() {
         let mut store = open_memory();
         let expr = "minutely";
         let cal: Calendar = expr.parse().unwrap();
         let now = Timestamp::now();
         let next = cal.next_occurrence(now).expect("next");
-        let id = store.add_task("brush teeth".into(), expr).expect("add");
+        let id = store
+            .add_task("brush teeth".into(), expr, None)
+            .expect("add");
         let stored_expr: String = store
             .conn
             .query_row(
@@ -215,7 +255,7 @@ mod tests {
         let cal: Calendar = expr.parse().unwrap();
         let now = Timestamp::now();
         let expected_next = cal.next_occurrence(now).expect("next");
-        let id = store.add_task("lunch".into(), expr).unwrap();
+        let id = store.add_task("lunch".into(), expr, None).unwrap();
         let stored: Option<i64> = store
             .conn
             .query_row(
@@ -230,8 +270,8 @@ mod tests {
     #[test]
     fn list_tasks_returns_all_rows() {
         let mut store = open_memory();
-        store.add_task("a".into(), "minutely").unwrap();
-        store.add_task("b".into(), "minutely").unwrap();
+        store.add_task("a".into(), "minutely", None).unwrap();
+        store.add_task("b".into(), "minutely", None).unwrap();
         let list = store.list_tasks().expect("list");
         assert_eq!(list.len(), 2);
         let descs: Vec<_> = list.iter().map(|r| r.description.as_str()).collect();
@@ -242,7 +282,7 @@ mod tests {
     #[test]
     fn delete_task_removes_row() {
         let mut store = open_memory();
-        let id = store.add_task("gone".into(), "minutely").unwrap();
+        let id = store.add_task("gone".into(), "minutely", None).unwrap();
         store.delete_task(id).expect("delete");
         let list = store.list_tasks().unwrap();
         assert!(list.iter().all(|r| r.id != id));

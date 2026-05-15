@@ -1,8 +1,8 @@
 package com.github.unldenis.easyplannerapp.ui.settings
 
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
@@ -25,7 +25,8 @@ import com.github.unldenis.easyplannerapp.ui.theme.ThemeMode
 
 /**
  * Uses a plain [Column] instead of nesting another [androidx.compose.material3.Scaffold] under
- * [MainActivity]'s scaffold for the same inset/dialog reason as [HomeScreen].
+ * [com.github.unldenis.easyplannerapp.MainActivity]'s scaffold for the same inset/dialog reason as
+ * [com.github.unldenis.easyplannerapp.ui.home.HomeScreen].
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,10 +35,7 @@ fun SettingsScreen(
     onThemeModeChange: (ThemeMode) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxSize(),
-    ) {
+    Column(modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(stringResource(R.string.nav_settings)) },
             colors = TopAppBarDefaults.topAppBarColors(
