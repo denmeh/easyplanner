@@ -4,20 +4,24 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +30,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -35,6 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.github.unldenis.easyplannerapp.data.setThemeMode
 import com.github.unldenis.easyplannerapp.data.themeModeFlow
+import com.github.unldenis.easyplannerapp.ui.home.AddTaskScreen
 import com.github.unldenis.easyplannerapp.ui.home.HomeScreen
 import com.github.unldenis.easyplannerapp.ui.settings.SettingsScreen
 import com.github.unldenis.easyplannerapp.ui.theme.EasyPlannerTheme
@@ -44,7 +50,10 @@ import kotlinx.coroutines.launch
 private object Routes {
     const val HOME = "home"
     const val SETTINGS = "settings"
+    const val ADD_TASK = "add_task"
 }
+
+private const val NavAnimMs = 300
 
 /**
  * Single [androidx.compose.material3.Scaffold] owns the snackbar and bottom navigation so window
@@ -102,44 +111,46 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     snackbarHost = { SnackbarHost(snackbarHostState) },
                     bottomBar = {
-                        NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 0.dp,
-                        ) {
-                            NavigationBarItem(
-                                icon = {
-                                    Icon(
-                                        Icons.Outlined.Home,
-                                        contentDescription = stringResource(R.string.content_desc_home),
-                                    )
-                                },
-                                label = { Text(stringResource(R.string.nav_home)) },
-                                selected = currentDestination?.hierarchy?.any { it.route == Routes.HOME } == true,
-                                onClick = {
-                                    navController.navigate(Routes.HOME) {
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                colors = navItemColors,
-                            )
-                            NavigationBarItem(
-                                icon = {
-                                    Icon(
-                                        Icons.Outlined.Settings,
-                                        contentDescription = stringResource(R.string.content_desc_settings),
-                                    )
-                                },
-                                label = { Text(stringResource(R.string.nav_settings)) },
-                                selected = currentDestination?.hierarchy?.any { it.route == Routes.SETTINGS } == true,
-                                onClick = {
-                                    navController.navigate(Routes.SETTINGS) {
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                                colors = navItemColors,
-                            )
+                        if (currentDestination?.route != Routes.ADD_TASK) {
+                            NavigationBar(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                tonalElevation = 0.dp,
+                            ) {
+                                NavigationBarItem(
+                                    icon = {
+                                        Icon(
+                                            Icons.Outlined.Home,
+                                            contentDescription = stringResource(R.string.content_desc_home),
+                                        )
+                                    },
+                                    label = { Text(stringResource(R.string.nav_home)) },
+                                    selected = currentDestination?.hierarchy?.any { it.route == Routes.HOME } == true,
+                                    onClick = {
+                                        navController.navigate(Routes.HOME) {
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                    colors = navItemColors,
+                                )
+                                NavigationBarItem(
+                                    icon = {
+                                        Icon(
+                                            Icons.Outlined.Settings,
+                                            contentDescription = stringResource(R.string.content_desc_settings),
+                                        )
+                                    },
+                                    label = { Text(stringResource(R.string.nav_settings)) },
+                                    selected = currentDestination?.hierarchy?.any { it.route == Routes.SETTINGS } == true,
+                                    onClick = {
+                                        navController.navigate(Routes.SETTINGS) {
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                    colors = navItemColors,
+                                )
+                            }
                         }
                     },
                 ) { innerPadding ->
@@ -148,10 +159,39 @@ class MainActivity : ComponentActivity() {
                         startDestination = Routes.HOME,
                         modifier = Modifier.padding(innerPadding),
                     ) {
-                        composable(Routes.HOME) {
+                        composable(
+                            Routes.HOME,
+                            exitTransition = {
+                                if (targetState.destination.route == Routes.ADD_TASK) {
+                                    fadeOut(animationSpec = tween(NavAnimMs)) +
+                                        slideOutHorizontally(
+                                            animationSpec = tween(NavAnimMs),
+                                            targetOffsetX = { -it / 5 },
+                                        )
+                                } else {
+                                    null
+                                }
+                            },
+                            popEnterTransition = {
+                                if (initialState.destination.route == Routes.ADD_TASK) {
+                                    fadeIn(animationSpec = tween(NavAnimMs)) +
+                                        slideInHorizontally(
+                                            animationSpec = tween(NavAnimMs),
+                                            initialOffsetX = { -it / 5 },
+                                        )
+                                } else {
+                                    null
+                                }
+                            },
+                        ) {
                             HomeScreen(
                                 viewModel = plannerViewModel,
                                 tasks = tasks,
+                                onNavigateToAddTask = {
+                                    navController.navigate(Routes.ADD_TASK) {
+                                        launchSingleTop = true
+                                    }
+                                },
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }
@@ -161,6 +201,29 @@ class MainActivity : ComponentActivity() {
                                 onThemeModeChange = { mode ->
                                     scope.launch { context.setThemeMode(mode) }
                                 },
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        composable(
+                            Routes.ADD_TASK,
+                            enterTransition = {
+                                fadeIn(animationSpec = tween(NavAnimMs)) +
+                                    slideInHorizontally(
+                                        animationSpec = tween(NavAnimMs),
+                                        initialOffsetX = { it },
+                                    )
+                            },
+                            popExitTransition = {
+                                fadeOut(animationSpec = tween(NavAnimMs)) +
+                                    slideOutHorizontally(
+                                        animationSpec = tween(NavAnimMs),
+                                        targetOffsetX = { it },
+                                    )
+                            },
+                        ) {
+                            AddTaskScreen(
+                                navController = navController,
+                                viewModel = plannerViewModel,
                                 modifier = Modifier.fillMaxSize(),
                             )
                         }

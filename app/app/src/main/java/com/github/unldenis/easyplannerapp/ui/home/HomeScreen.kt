@@ -12,19 +12,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -42,7 +38,6 @@ import com.github.unldenis.easyplanner.PlannerTask
 import com.github.unldenis.easyplannerapp.PlannerViewModel
 import com.github.unldenis.easyplannerapp.R
 import java.text.SimpleDateFormat
-import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
@@ -50,37 +45,6 @@ private val nextTimeFormat = SimpleDateFormat("EEE, MMM d · HH:mm", Locale.getD
 
 /** Delete dialog keeps primitives so the row object is not held across JNI + list refresh. */
 private data class PendingDelete(val id: Long, val description: String)
-
-private enum class SchedulePreset {
-    Minutely,
-    Hourly,
-    Daily,
-    Weekly,
-    Monthly,
-    Other,
-    ;
-
-    fun toCalendarExpr(): String? =
-        when (this) {
-            Minutely -> "minutely"
-            Hourly -> "hourly"
-            Daily -> "daily"
-            Weekly -> "weekly"
-            Monthly -> "monthly"
-            Other -> null
-        }
-}
-
-@Composable
-private fun SchedulePreset.displayLabel(): String =
-    when (this) {
-        SchedulePreset.Minutely -> stringResource(R.string.schedule_minutely)
-        SchedulePreset.Hourly -> stringResource(R.string.schedule_hourly)
-        SchedulePreset.Daily -> stringResource(R.string.schedule_daily)
-        SchedulePreset.Weekly -> stringResource(R.string.schedule_weekly)
-        SchedulePreset.Monthly -> stringResource(R.string.schedule_monthly)
-        SchedulePreset.Other -> stringResource(R.string.schedule_other)
-    }
 
 /**
  * Task tab: DB work stays in the ViewModel; this layer only renders [tasks] and routes user
@@ -92,9 +56,9 @@ private fun SchedulePreset.displayLabel(): String =
 fun HomeScreen(
     viewModel: PlannerViewModel,
     tasks: List<PlannerTask>,
+    onNavigateToAddTask: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var showAdd by remember { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<PendingDelete?>(null) }
 
     Box(modifier.fillMaxSize()) {
@@ -144,7 +108,7 @@ fun HomeScreen(
         }
 
         FloatingActionButton(
-            onClick = { showAdd = true },
+            onClick = onNavigateToAddTask,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(20.dp),
@@ -153,16 +117,6 @@ fun HomeScreen(
         ) {
             Icon(Icons.Default.Add, contentDescription = stringResource(R.string.add_task))
         }
-    }
-
-    if (showAdd) {
-        AddTaskDialog(
-            onDismiss = { showAdd = false },
-            onConfirm = { title, schedule, wallClockTz ->
-                viewModel.addTask(title, schedule, wallClockTz)
-                showAdd = false
-            },
-        )
     }
 
     pendingDelete?.let { pending ->
@@ -258,99 +212,3 @@ private fun formatNext(epoch: ULong?): String =
     } else {
         nextTimeFormat.format(Date(epoch.toLong() * 1000L))
     }
-
-@Composable
-private fun AddTaskDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (String, String, String) -> Unit,
-) {
-    var title by remember { mutableStateOf("") }
-    var preset by remember { mutableStateOf(SchedulePreset.Minutely) }
-    var customSchedule by remember { mutableStateOf("") }
-    var scheduleMenuExpanded by remember { mutableStateOf(false) }
-    var wallClockTz by remember { mutableStateOf(ZoneId.systemDefault().id) }
-
-    val resolvedSchedule =
-        preset.toCalendarExpr()?.trim().orEmpty().ifEmpty { customSchedule.trim() }
-    val canSave = title.isNotBlank() && resolvedSchedule.isNotBlank()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.add_task)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.field_description)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Box(Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = preset.displayLabel(),
-                        onValueChange = {},
-                        readOnly = true,
-                        singleLine = true,
-                        label = { Text(stringResource(R.string.field_schedule)) },
-                        supportingText = {
-                            Text(stringResource(R.string.field_schedule_dropdown_hint))
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { scheduleMenuExpanded = true }) {
-                                Icon(
-                                    Icons.Default.ArrowDropDown,
-                                    contentDescription = stringResource(R.string.field_schedule),
-                                )
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    DropdownMenu(
-                        expanded = scheduleMenuExpanded,
-                        onDismissRequest = { scheduleMenuExpanded = false },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        SchedulePreset.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(option.displayLabel()) },
-                                onClick = {
-                                    preset = option
-                                    scheduleMenuExpanded = false
-                                },
-                            )
-                        }
-                    }
-                }
-                if (preset == SchedulePreset.Other) {
-                    OutlinedTextField(
-                        value = customSchedule,
-                        onValueChange = { customSchedule = it },
-                        label = { Text(stringResource(R.string.field_custom_schedule)) },
-                        supportingText = { Text(stringResource(R.string.field_schedule_hint)) },
-                        singleLine = false,
-                        minLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                OutlinedTextField(
-                    value = wallClockTz,
-                    onValueChange = { wallClockTz = it },
-                    label = { Text(stringResource(R.string.field_wall_clock_tz)) },
-                    supportingText = { Text(stringResource(R.string.field_wall_clock_tz_hint)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(title, resolvedSchedule, wallClockTz) },
-                enabled = canSave,
-            ) { Text(stringResource(R.string.save)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
-}
