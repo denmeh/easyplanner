@@ -78,8 +78,11 @@ fn map_scheduler_event(ev: TaskLifecycleEvent) -> PlannerSchedulerEvent {
 
 /// Owns the DB file; Kotlin should call [`PlannerStore::close`](PlannerStore::close) when the
 /// handle is dropped on the JVM side so the connection is released deterministically.
+///
+/// The scheduler is stored directly (not behind another `Mutex`); it already serializes DB
+/// access via its inner repository lock and is `Sync` for concurrent JNI calls.
 pub struct PlannerStore {
-    inner: Mutex<SqliteTaskScheduler>,
+    scheduler: SqliteTaskScheduler,
     /// Receiver from [`SqliteTaskScheduler::start_watcher`]; drained from JNI via
     /// [`PlannerStore::poll_scheduler_events`].
     event_rx: Mutex<Option<mpsc::Receiver<TaskLifecycleEvent>>>,
@@ -91,17 +94,14 @@ impl PlannerStore {
         SqliteTaskScheduler::open(path)
             .map_err(|e| e.to_string())
             .map(|scheduler| Self {
-                inner: Mutex::new(scheduler),
+                scheduler,
                 event_rx: Mutex::new(None),
             })
     }
 
     /// Starts the native SQLite poller. Events are queued until [`poll_scheduler_events`](PlannerStore::poll_scheduler_events).
     pub fn start_scheduler_loop(&self) -> Result<i64, String> {
-        let rx = match {
-            let guard = self.inner.lock().map_err(|e| e.to_string())?;
-            guard.start_watcher()
-        } {
+        let rx = match self.scheduler.start_watcher() {
             Ok(rx) => rx,
             Err(SchedulerError::WatcherAlreadyRunning) => return Ok(1),
             Err(e) => return Err(e.to_string()),
@@ -110,8 +110,7 @@ impl PlannerStore {
         let mut slot = self.event_rx.lock().map_err(|e| e.to_string())?;
         if slot.is_some() {
             drop(rx);
-            let guard = self.inner.lock().map_err(|e| e.to_string())?;
-            guard.stop_watcher();
+            self.scheduler.stop_watcher();
             return Err("scheduler event queue in inconsistent state".to_string());
         }
         *slot = Some(rx);
@@ -119,10 +118,7 @@ impl PlannerStore {
     }
 
     pub fn stop_scheduler_loop(&self) -> Result<i64, String> {
-        {
-            let guard = self.inner.lock().map_err(|e| e.to_string())?;
-            guard.stop_watcher();
-        }
+        self.scheduler.stop_watcher();
         let _ = self.event_rx.lock().map_err(|e| e.to_string())?.take();
         Ok(1)
     }
@@ -145,8 +141,10 @@ impl PlannerStore {
     }
 
     pub fn list_tasks(&self) -> Result<Vec<PlannerTask>, String> {
-        let guard = self.inner.lock().map_err(|e| e.to_string())?;
-        let rows = guard.list_tasks().map_err(|e| e.to_string())?;
+        let rows = self
+            .scheduler
+            .list_tasks()
+            .map_err(|e| e.to_string())?;
         Ok(rows.into_iter().map(map_task).collect())
     }
 
@@ -158,10 +156,9 @@ impl PlannerStore {
         calendar_expr: String,
         wall_clock_tz: String,
     ) -> Result<i64, String> {
-        let guard = self.inner.lock().map_err(|e| e.to_string())?;
         let tz = wall_clock_tz.trim();
         let tz_opt = if tz.is_empty() { None } else { Some(tz) };
-        guard
+        self.scheduler
             .add_task(title, notes, &calendar_expr, tz_opt)
             .map_err(|e| e.to_string())
     }
@@ -174,18 +171,16 @@ impl PlannerStore {
         calendar_expr: String,
         wall_clock_tz: String,
     ) -> Result<i64, String> {
-        let guard = self.inner.lock().map_err(|e| e.to_string())?;
         let tz = wall_clock_tz.trim();
         let tz_opt = if tz.is_empty() { None } else { Some(tz) };
-        guard
+        self.scheduler
             .update_task(id, title, notes, &calendar_expr, tz_opt)
             .map_err(|e| e.to_string())?;
         Ok(1)
     }
 
     pub fn set_task_enabled(&self, id: i64, enabled: bool) -> Result<i64, String> {
-        let guard = self.inner.lock().map_err(|e| e.to_string())?;
-        guard
+        self.scheduler
             .set_task_enabled(id, enabled)
             .map_err(|e| e.to_string())?;
         Ok(1)
@@ -193,8 +188,9 @@ impl PlannerStore {
 
     /// Returns `1` on success. `Result<(), String>` crashes BoltFFI Android JNI on `Ok(())`; see https://github.com/boltffi/boltffi/issues/308
     pub fn delete_task(&self, id: i64) -> Result<i64, String> {
-        let guard = self.inner.lock().map_err(|e| e.to_string())?;
-        guard.delete_task(id).map_err(|e| e.to_string())?;
+        self.scheduler
+            .delete_task(id)
+            .map_err(|e| e.to_string())?;
         Ok(1)
     }
 }
