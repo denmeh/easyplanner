@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -37,11 +38,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -99,10 +100,17 @@ private const val SchedulerEventPollMs = 1_500L
  *
  * FFI failures are shown via a snackbar tied to `LaunchedEffect(error)` so the ViewModel only
  * exposes state; clearing after `showSnackbar` keeps a repeat of the same message observable.
+ *
+ * The Android 12+ splash stays visible until [PlannerViewModel.initialLoadComplete] so JNI/SQLite
+ * work does not surface as an empty frame after the splash animation.
  */
 class MainActivity : ComponentActivity() {
+    private val plannerViewModel: PlannerViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition { !plannerViewModel.initialLoadComplete.value }
         enableEdgeToEdge()
         setContent {
             val context = LocalContext.current
@@ -112,7 +120,6 @@ class MainActivity : ComponentActivity() {
 
             EasyPlannerTheme(themeMode = themeMode) {
                 val snackbarHostState = remember { SnackbarHostState() }
-                val plannerViewModel: PlannerViewModel = viewModel()
                 val tasks by plannerViewModel.tasks.collectAsStateWithLifecycle()
                 val error by plannerViewModel.error.collectAsStateWithLifecycle()
                 val lifecycleOwner = LocalLifecycleOwner.current

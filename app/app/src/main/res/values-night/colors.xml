@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Match dark theme surface (Shadcn zinc-950) so cold start does not flash bright gray. -->
+    <color name="splash_background">#FF09090B</color>
+    <color name="window_background">#FF09090B</color>
+</resources>

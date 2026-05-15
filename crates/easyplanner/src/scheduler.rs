@@ -268,9 +268,7 @@ where
     }
 
     fn lock_repo(&self) -> Result<MutexGuard<'_, R>, SchedulerError> {
-        self.repo
-            .lock()
-            .map_err(|_| SchedulerError::MutexPoisoned)
+        self.repo.lock().map_err(|_| SchedulerError::MutexPoisoned)
     }
 
     fn next_occurrence_after_fire(
@@ -440,10 +438,7 @@ mod tests {
 
         let events = scheduler.tick().expect("tick");
         assert_eq!(events.len(), 1);
-        assert!(matches!(
-            events[0],
-            TaskLifecycleEvent::Expired { .. }
-        ));
+        assert!(matches!(events[0], TaskLifecycleEvent::Expired { .. }));
 
         let row = scheduler
             .list_tasks()

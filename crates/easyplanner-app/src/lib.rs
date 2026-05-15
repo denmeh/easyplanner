@@ -1,11 +1,11 @@
 //! JNI surface for the Android app. Keeps BoltFFI types in this crate so the domain library stays
 //! free of `boltffi` and so codegen sees `#[data]` on types defined here.
 //!
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 
 use boltffi::*;
 use easyplanner::{
-    schedule_summary, SchedulerError, SqliteTaskScheduler, Task, TaskLifecycleEvent, TaskState,
+    SchedulerError, SqliteTaskScheduler, Task, TaskLifecycleEvent, TaskState, schedule_summary,
 };
 
 /// Wire shape for Kotlin; field layout matches the `tasks` table (see migrations).
@@ -141,10 +141,7 @@ impl PlannerStore {
     }
 
     pub fn list_tasks(&self) -> Result<Vec<PlannerTask>, String> {
-        let rows = self
-            .scheduler
-            .list_tasks()
-            .map_err(|e| e.to_string())?;
+        let rows = self.scheduler.list_tasks().map_err(|e| e.to_string())?;
         Ok(rows.into_iter().map(map_task).collect())
     }
 
@@ -188,9 +185,7 @@ impl PlannerStore {
 
     /// Returns `1` on success. `Result<(), String>` crashes BoltFFI Android JNI on `Ok(())`; see https://github.com/boltffi/boltffi/issues/308
     pub fn delete_task(&self, id: i64) -> Result<i64, String> {
-        self.scheduler
-            .delete_task(id)
-            .map_err(|e| e.to_string())?;
+        self.scheduler.delete_task(id).map_err(|e| e.to_string())?;
         Ok(1)
     }
 }

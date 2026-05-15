@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Holds the Bolt [PlannerStore] for the activity scope and mirrors task rows into [StateFlow] so
@@ -45,6 +46,11 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
+
+    private val _initialLoadComplete = MutableStateFlow(false)
+    val initialLoadComplete: StateFlow<Boolean> = _initialLoadComplete.asStateFlow()
+
+    private val initialRefreshCommitted = AtomicBoolean(false)
 
     init {
         refresh()
@@ -97,9 +103,16 @@ class PlannerViewModel(application: Application) : AndroidViewModel(application)
     fun refresh() {
         viewModelScope.launch {
             try {
-                _tasks.value = store.listTasks()
+                _tasks.value =
+                    withContext(Dispatchers.Default) {
+                        store.listTasks()
+                    }
             } catch (e: Throwable) {
                 _error.value = e.message ?: e.toString()
+            } finally {
+                if (initialRefreshCommitted.compareAndSet(false, true)) {
+                    _initialLoadComplete.value = true
+                }
             }
         }
     }

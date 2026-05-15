@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scale down inside the splash circle without wrapping in InsetDrawable — inset breaks AdaptiveIconDrawable masking (rounded / squircle). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="78dp"
+        android:height="78dp"
+        android:gravity="center"
+        android:drawable="@mipmap/ic_launcher" />
+</layer-list>

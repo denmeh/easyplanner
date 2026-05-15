@@ -123,9 +123,7 @@ impl TaskRepository for SqliteTaskStore {
         let sql = format!("{TASK_SELECT} WHERE id = ?1");
         let mut stmt = self.conn.prepare(&sql)?;
         let mut rows = stmt.query_map(params![id], row_to_task)?;
-        Ok(rows
-            .next()
-            .transpose()?)
+        Ok(rows.next().transpose()?)
     }
 
     fn delete_task(&mut self, id: i64) -> Result<(), StoreError> {
@@ -210,8 +208,8 @@ mod tests {
     use super::*;
     use crate::calendar::Calendar;
     use crate::model::Timestamp;
-    use crate::store::TaskStatus;
     use crate::scheduler::{SchedulerError, SqliteTaskScheduler, TaskState};
+    use crate::store::TaskStatus;
 
     #[test]
     fn migrations_apply_and_tasks_table_exists() {
@@ -232,7 +230,12 @@ mod tests {
     fn invalid_wall_clock_tz_on_add_returns_error() {
         let scheduler = SqliteTaskScheduler::open(":memory:").expect("open");
         let err = scheduler
-            .add_task("x".into(), String::new(), "minutely", Some("Not/AValid/ZoneId"))
+            .add_task(
+                "x".into(),
+                String::new(),
+                "minutely",
+                Some("Not/AValid/ZoneId"),
+            )
             .unwrap_err();
         assert!(matches!(err, SchedulerError::InvalidTimezone(_)));
     }
@@ -249,7 +252,8 @@ mod tests {
             .expect("add");
         let due = scheduler.tick_at(next).expect("tick");
         assert!(
-            due.iter().any(|e| matches!(e, crate::scheduler::TaskLifecycleEvent::Expired { .. })),
+            due.iter()
+                .any(|e| matches!(e, crate::scheduler::TaskLifecycleEvent::Expired { .. })),
             "task should be due at or after its first next occurrence"
         );
         let tasks = scheduler.list_tasks().expect("list");
